@@ -1,0 +1,10 @@
+# sistema
+.DS_Store
+*.pem
+
+# ambiente
+.env
+.env*.local
+
+# vercel
+.vercel
