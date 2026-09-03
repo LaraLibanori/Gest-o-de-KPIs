@@ -1,10 +1,12 @@
-# sistema
+node_modules/
+.next/
 .DS_Store
-*.pem
 
-# ambiente
+__pycache__/
+.venv/
+
 .env
 .env*.local
-
-# vercel
 .vercel
+*.pem
+*.tsbuildinfo

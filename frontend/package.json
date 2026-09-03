@@ -2,14 +2,15 @@
   "name": "kpi-builder",
   "version": "0.1.0",
   "private": true,
-  "description": "Plataforma web onde o usuario conecta um banco de dados e monta seus proprios dashboards de KPIs, sem programar.",
+  "description": "Plataforma web para conectar um banco de dados e montar dashboards de KPIs.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.114.0",
     "next": "15.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0"

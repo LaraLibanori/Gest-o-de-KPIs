@@ -1,107 +1,97 @@
 # KPI Builder
 
-Plataforma web onde a pessoa **conecta um banco de dados e monta seus proprios dashboards de indicadores (KPIs), sem precisar programar**.
+Plataforma web onde a pessoa conecta um banco de dados e monta seus próprios
+dashboards de indicadores, sem precisar programar.
 
-Projeto de TCC &mdash; Parte 5 (Desenvolvimento da aplicacao).
+Projeto de TCC — Parte 5 (Desenvolvimento da aplicação).
 
-## Arquitetura
+## Como funciona
 
-Monorepo com duas partes separadas:
+O login é feito pelo Supabase Auth, direto no navegador. O front guarda a
+sessão em cookie e manda o token do Supabase em toda chamada para a API. O
+FastAPI confere esse token, descobre quem é o usuário e só então roda as
+queries no Postgres do Supabase.
 
 ```
-kpi-builder/
-├─ frontend/   → Next.js 15 (App Router) + React 19 + TypeScript   (deploy no Vercel)
-└─ backend/    → FastAPI + uvicorn (Python)                        (deploy no Render/Railway)
+Next.js  ──login──>  Supabase Auth
+   │
+   └──/api + token──>  FastAPI  ──SQL──>  Postgres (Supabase)
 ```
 
-O front conversa com o backend por HTTP. O health check da API mora no backend, em `GET /health`.
+```
+frontend/   Next.js 15 (App Router) + React 19 + TypeScript
+backend/    FastAPI + asyncpg
+supabase/   schema.sql e seed.sql, para rodar no SQL Editor
+```
 
----
+Os dois sobem juntos na Vercel, no mesmo domínio: `/api/*` vai para o backend
+e o resto para o front. A configuração está no `vercel.json`.
 
-## Rodar tudo localmente
+## Configurar o Supabase
 
-Abra **dois terminais**.
+1. Crie um projeto em https://supabase.com.
+2. No **SQL Editor**, rode `supabase/schema.sql`.
+3. Crie sua conta pela tela de login do app.
+4. Rode `supabase/seed.sql` (troque o e-mail pelo seu) para ter dados de teste.
 
-### 1) Backend (FastAPI) &mdash; porta 8000
+## Rodar local
+
+Copie os exemplos de variáveis e preencha com as chaves do seu projeto:
 
 ```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+cp frontend/.env.local.example frontend/.env.local
+cp backend/.env.example backend/.env
+```
+
+Com a CLI da Vercel os dois serviços sobem juntos em http://localhost:3000:
+
+```bash
+npm i -g vercel
+vercel dev
+```
+
+Ou separado, em dois terminais:
+
+```bash
+cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+FRONTEND_ORIGIN=http://localhost:3000 uvicorn app.main:app --reload
 ```
-
-Testa: `curl http://localhost:8000/health` &rarr; `{ "status": "ok", ... }`
-Docs automaticas: http://localhost:8000/docs
-
-### 2) Frontend (Next.js) &mdash; porta 3000
 
 ```bash
-cd frontend
-npm install
-cp .env.local.example .env.local   # aponta pro backend em localhost:8000
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
-Abre http://localhost:3000 &mdash; a home mostra se a API esta online.
+Rodando separado, descomente `NEXT_PUBLIC_API_URL` no `.env.local`.
 
----
+## Variáveis de ambiente
 
-## Subir pro GitHub
+| Onde     | Variável                        | Para quê                          |
+|----------|---------------------------------|-----------------------------------|
+| frontend | `NEXT_PUBLIC_SUPABASE_URL`      | URL do projeto no Supabase        |
+| frontend | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave pública, usada no login     |
+| backend  | `SUPABASE_URL`                  | usada para validar o token        |
+| backend  | `DATABASE_URL`                  | conexão com o Postgres (pooler)   |
 
-O primeiro commit ja esta feito (o `.git` vem junto). Falta so criar o repo remoto e dar push. Troque `SEU-USUARIO` pelo dono do repo (ex: `LaraLibanori`):
+A `service_role key` não é usada em lugar nenhum e não deve ir para o front.
 
-1. Cria em https://github.com/new com nome `kpi-builder`, **sem** README/gitignore/license.
-2. Na pasta do projeto:
+## Endpoints
 
-```bash
-git remote add origin https://github.com/SEU-USUARIO/kpi-builder.git
-git branch -M main
-git push -u origin main
-```
+| Método | Rota                                     |
+|--------|------------------------------------------|
+| GET    | `/api/health`                            |
+| GET    | `/api/dashboards`                        |
+| POST   | `/api/dashboards`                        |
+| DELETE | `/api/dashboards/{id}`                   |
+| GET    | `/api/dashboards/{id}/indicadores`       |
+| POST   | `/api/dashboards/{id}/indicadores`       |
+| GET    | `/api/indicadores/{id}/valor`            |
+| DELETE | `/api/indicadores/{id}`                  |
 
----
+Menos o `/health`, todas exigem o header `Authorization: Bearer <token>`.
 
-## Deploy
+## O que falta
 
-### Frontend &rarr; Vercel
-
-1. Conta em https://vercel.com (loga com o GitHub).
-2. **Add New... > Project** e escolhe o repo `kpi-builder`.
-3. Em **Root Directory**, seleciona a pasta **`frontend`** (importante, porque o repo tem duas pastas).
-4. O Vercel reconhece Next.js sozinho. Em **Environment Variables**, adiciona:
-   - `NEXT_PUBLIC_API_URL` = a URL publica do backend (depois de fazer o deploy dele).
-5. **Deploy**. Cada `git push` na `main` vira deploy automatico.
-
-### Backend &rarr; Render (ou Railway)
-
-O uvicorn e um servidor que fica rodando, entao **nao** vai no Vercel junto com o front.
-
-1. Em https://render.com, **New > Web Service** apontando pro mesmo repo.
-2. **Root Directory:** `backend`
-3. **Build Command:** `pip install -r requirements.txt`
-4. **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Em variaveis de ambiente, adiciona `FRONTEND_ORIGIN` = a URL do front no Vercel (pro CORS).
-6. Depois do deploy, copia a URL da API e coloca no `NEXT_PUBLIC_API_URL` do Vercel.
-
----
-
-## Variaveis de ambiente (resumo)
-
-| Onde     | Variavel             | Pra que                                  |
-|----------|----------------------|------------------------------------------|
-| frontend | `NEXT_PUBLIC_API_URL`| URL do backend que o front vai chamar    |
-| backend  | `FRONTEND_ORIGIN`    | URL do front liberada no CORS            |
-
-Credenciais de banco de dados **nunca** vao no codigo &mdash; entram em `.env` (local) ou nas Environment Variables do provedor.
-
----
-
-## Proximos passos (rascunho)
-
-- [ ] Endpoint no backend pra testar conexao com um banco (host, porta, usuario, senha)
-- [ ] Leitura do schema (tabelas e colunas disponiveis)
-- [ ] Editor de indicadores (metrica, agrupamento, filtro)
-- [ ] Renderizacao dos graficos no dashboard (front)
-- [ ] Autenticacao de usuarios
+- [ ] Conectar um banco externo do usuário, além das tabelas do Supabase
+- [ ] Filtros e agrupamento por período nos indicadores
+- [ ] Gráficos, hoje o dashboard só mostra o número

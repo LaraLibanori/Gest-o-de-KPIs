@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "KPI Builder",
   description:
-    "Conecte seu banco de dados e monte seus proprios dashboards de indicadores, sem precisar programar.",
+    "Conecte seu banco de dados e monte seus próprios dashboards de indicadores, sem precisar programar.",
 };
 
 export default function RootLayout({

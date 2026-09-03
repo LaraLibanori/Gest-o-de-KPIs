@@ -1,0 +1,157 @@
+:root {
+  --bg: #0b1020;
+  --fg: #e8ecf4;
+  --muted: #9aa5b8;
+  --accent: #4f8cff;
+  --card: #131a2e;
+  --borda: #263150;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+input,
+select {
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.link {
+  background: none;
+  color: var(--accent);
+  padding: 8px 0;
+}
+
+.linha {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+
+.linha input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.abas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--borda);
+  padding-bottom: 12px;
+}
+
+.aba {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--borda);
+}
+
+.aba.ativa {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.indicador {
+  position: relative;
+  gap: 4px;
+}
+
+.numero {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.remover {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  color: var(--muted);
+  padding: 2px 8px;
+  font-size: 18px;
+}
+
+.erro {
+  color: #f87171;
+}
+
+.ok {
+  color: #4ade80;
+}
+
+form.card label {
+  font-size: 14px;
+  color: var(--muted);
+}
