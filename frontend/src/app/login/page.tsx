@@ -8,7 +8,7 @@ export default async function Login() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/dashboards");
+  if (user) redirect("/");
 
   return <Formulario />;
 }

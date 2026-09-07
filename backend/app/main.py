@@ -1,9 +1,11 @@
 import os
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from sqlalchemy import text
 
-from .routers import dashboards, indicadores
+from .db import abrir_conexao
+from .routers import conexoes, organizacoes, perfil
 
 app = FastAPI(title="KPI Builder API", version="0.1.0")
 
@@ -15,12 +17,13 @@ if frontend_origin:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[frontend_origin],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
-app.include_router(dashboards.router)
-app.include_router(indicadores.router)
+app.include_router(perfil.router)
+app.include_router(organizacoes.router)
+app.include_router(conexoes.router)
 
 
 @app.get("/health")
@@ -30,3 +33,15 @@ def health() -> dict:
         "service": "kpi-builder-api",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# health diz que subiu, ready diz que o banco responde.
+@app.get("/ready")
+async def ready(response: Response) -> dict:
+    try:
+        async with abrir_conexao() as conexao:
+            role = await conexao.scalar(text("select current_user"))
+    except Exception:  # noqa: BLE001 - qualquer falha aqui vira 503, nunca 500
+        response.status_code = 503
+        return {"status": "sem banco"}
+    return {"status": "ok", "role": role}

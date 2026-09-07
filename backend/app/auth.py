@@ -1,46 +1,61 @@
 from dataclasses import dataclass
 from typing import Annotated
+from uuid import UUID
 
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
-from .config import AUDIENCE, ISSUER, JWKS_URL, JWT_SECRET
+from .config import AUDIENCE, ISSUER, JWKS_URL
 
-bearer = HTTPBearer()
-_jwks = PyJWKClient(JWKS_URL) if not JWT_SECRET else None
+# auto_error desligado para responder 401, e não o 403 que vem de fábrica.
+bearer = HTTPBearer(auto_error=False)
+
+_jwks: PyJWKClient | None = None
+
+
+def _chaves() -> PyJWKClient:
+    global _jwks
+    if _jwks is None:
+        _jwks = PyJWKClient(JWKS_URL, timeout=5)
+    return _jwks
 
 
 @dataclass
 class User:
-    id: str
+    id: UUID
     email: str | None
 
 
-# Função sync: o FastAPI roda ela em threadpool e não trava o event loop.
-def get_user(cred: Annotated[HTTPAuthorizationCredentials, Depends(bearer)]) -> User:
-    try:
-        if JWT_SECRET:
-            claims = jwt.decode(
-                cred.credentials,
-                JWT_SECRET,
-                algorithms=["HS256"],
-                audience=AUDIENCE,
-            )
-        else:
-            key = _jwks.get_signing_key_from_jwt(cred.credentials).key
-            claims = jwt.decode(
-                cred.credentials,
-                key,
-                algorithms=["ES256", "RS256"],
-                audience=AUDIENCE,
-                issuer=ISSUER,
-            )
-    except jwt.PyJWTError:
-        raise HTTPException(401, "token inválido ou expirado")
+def _recusar() -> HTTPException:
+    return HTTPException(401, "token inválido ou expirado")
 
-    return User(id=claims["sub"], email=claims.get("email"))
+
+# Função sync: o FastAPI roda ela em threadpool e não trava o event loop.
+def get_user(
+    cred: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> User:
+    if cred is None:
+        raise HTTPException(401, "não autenticado")
+
+    try:
+        chave = _chaves().get_signing_key_from_jwt(cred.credentials).key
+        claims = jwt.decode(
+            cred.credentials,
+            chave,
+            algorithms=["ES256", "RS256"],
+            audience=AUDIENCE,
+            issuer=ISSUER,
+        )
+    except jwt.PyJWTError:
+        raise _recusar()
+
+    # O sub precisa existir e ser uuid: sem isso vira erro 500 lá na query.
+    try:
+        return User(id=UUID(claims["sub"]), email=claims.get("email"))
+    except (KeyError, ValueError, TypeError):
+        raise _recusar()
 
 
 CurrentUser = Annotated[User, Depends(get_user)]

@@ -16,7 +16,7 @@ export async function createClient() {
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Server Component não deixa escrever cookie; o middleware já renova.
+            // Server Component não deixa escrever cookie; quem renova é o cliente.
           }
         },
       },

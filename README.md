@@ -5,12 +5,26 @@ dashboards de indicadores, sem precisar programar.
 
 Projeto de TCC — Parte 5 (Desenvolvimento da aplicação).
 
+No ar: <https://kpi-builder-ivanabreuelementardis-projects.vercel.app>
+
+Conta para testar:
+
+```
+e-mail   admin@kpibuilder.app
+senha    admin123
+```
+
+Também dá para criar a sua na própria tela de login: a conta já entra ativa,
+sem confirmar e-mail.
+
+Por enquanto estão prontos o login, as organizações e o cadastro das conexões.
+A leitura da tabela fato e os indicadores vêm depois.
+
 ## Como funciona
 
 O login é feito pelo Supabase Auth, direto no navegador. O front guarda a
-sessão em cookie e manda o token do Supabase em toda chamada para a API. O
-FastAPI confere esse token, descobre quem é o usuário e só então roda as
-queries no Postgres do Supabase.
+sessão em cookie e manda o token em toda chamada para a API. O FastAPI confere
+esse token e só então consulta o banco.
 
 ```
 Next.js  ──login──>  Supabase Auth
@@ -18,80 +32,117 @@ Next.js  ──login──>  Supabase Auth
    └──/api + token──>  FastAPI  ──SQL──>  Postgres (Supabase)
 ```
 
-```
-frontend/   Next.js 15 (App Router) + React 19 + TypeScript
-backend/    FastAPI + asyncpg
-supabase/   schema.sql e seed.sql, para rodar no SQL Editor
-```
-
 Os dois sobem juntos na Vercel, no mesmo domínio: `/api/*` vai para o backend
-e o resto para o front. A configuração está no `vercel.json`.
+e o resto para o front, conforme o `vercel.json`.
 
-## Configurar o Supabase
+```
+frontend/   Next.js 15 (App Router) + React 19 + TypeScript + shadcn/ui
+backend/    FastAPI + SQLAlchemy + Alembic
+supabase/   seed.sql, para rodar no SQL Editor
+```
 
-1. Crie um projeto em https://supabase.com.
-2. No **SQL Editor**, rode `supabase/schema.sql`.
-3. Crie sua conta pela tela de login do app.
-4. Rode `supabase/seed.sql` (troque o e-mail pelo seu) para ter dados de teste.
+Tabelas:
+
+```
+perfis                 dados do usuário na aplicação
+organizacoes           o espaço compartilhado
+organizacao_membros    quem participa de qual organização
+convites               quem foi convidado e ainda não tem conta
+conexoes               bancos da empresa, com a senha cifrada
+```
+
+Tudo pendura na organização, não no usuário. É assim que duas pessoas veem os
+mesmos dados.
 
 ## Rodar local
 
-Copie os exemplos de variáveis e preencha com as chaves do seu projeto:
+Os comandos estão no `Makefile`. No Windows, use o Git Bash.
 
 ```bash
-cp frontend/.env.local.example frontend/.env.local
-cp backend/.env.example backend/.env
+make env-init   # cria frontend/.env.local e backend/.env
+make instalar   # dependências do front e do back
+make migrar     # cria as tabelas no Supabase
+make dev        # front em :3000 e back em :8000
 ```
 
-Com a CLI da Vercel os dois serviços sobem juntos em http://localhost:3000:
+Preencha os dois arquivos de ambiente antes do `make dev`. Use a string do
+**pooler** do Supabase, não a conexão direta. `make ajuda` lista o resto.
+
+Para conferir se compila, o mesmo que roda no CI:
 
 ```bash
-npm i -g vercel
-vercel dev
+make checar
 ```
 
-Ou separado, em dois terminais:
+## Migrations
+
+O banco é descrito em `backend/app/models.py` e versionado pelo Alembic.
 
 ```bash
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-FRONTEND_ORIGIN=http://localhost:3000 uvicorn app.main:app --reload
+make migrar                      # aplica o que estiver pendente
+make migracao m="cria conexoes"  # gera a migration a partir do models.py
+make migracoes                   # migration atual e histórico
 ```
+
+## Deploy
+
+Sai da máquina, pela CLI da Vercel.
 
 ```bash
-cd frontend && npm install && npm run dev
+make env        # manda as variáveis do .env para a Vercel
+make preview    # publica um preview
+make producao   # publica em produção
 ```
 
-Rodando separado, descomente `NEXT_PUBLIC_API_URL` no `.env.local`.
+Os dois últimos terminam conferindo as rotas principais.
 
 ## Variáveis de ambiente
 
-| Onde     | Variável                        | Para quê                          |
-|----------|---------------------------------|-----------------------------------|
-| frontend | `NEXT_PUBLIC_SUPABASE_URL`      | URL do projeto no Supabase        |
-| frontend | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave pública, usada no login     |
-| backend  | `SUPABASE_URL`                  | usada para validar o token        |
-| backend  | `DATABASE_URL`                  | conexão com o Postgres (pooler)   |
+| Onde     | Variável                        | Para quê                            |
+|----------|---------------------------------|-------------------------------------|
+| frontend | `NEXT_PUBLIC_SUPABASE_URL`      | URL do projeto no Supabase          |
+| frontend | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave pública, usada no login       |
+| backend  | `SUPABASE_URL`                  | usada para validar o token          |
+| backend  | `DATABASE_URL`                  | conexão da API                      |
+| backend  | `APP_SECRET_KEY`                | cifra a senha de cada conexão       |
+| backend  | `MIGRATIONS_DATABASE_URL`       | só para o Alembic, fica na máquina  |
+| backend  | `KPI_APP_PASSWORD`              | só para a migration que cria o usuário do banco |
 
-A `service_role key` não é usada em lugar nenhum e não deve ir para o front.
+As duas últimas não vão para a Vercel.
+
+## Acesso
+
+São duas camadas. Na aplicação, cada rota confere se você participa da
+organização. No banco, a API conecta com um usuário sem privilégio de
+administrador, e as políticas de RLS filtram as linhas pelo usuário da sessão.
 
 ## Endpoints
 
-| Método | Rota                                     |
-|--------|------------------------------------------|
-| GET    | `/api/health`                            |
-| GET    | `/api/dashboards`                        |
-| POST   | `/api/dashboards`                        |
-| DELETE | `/api/dashboards/{id}`                   |
-| GET    | `/api/dashboards/{id}/indicadores`       |
-| POST   | `/api/dashboards/{id}/indicadores`       |
-| GET    | `/api/indicadores/{id}/valor`            |
-| DELETE | `/api/indicadores/{id}`                  |
+| Método | Rota                                              |
+|--------|---------------------------------------------------|
+| GET    | `/api/health`                                     |
+| GET    | `/api/ready`                                      |
+| GET    | `/api/perfil`                                     |
+| GET    | `/api/organizacoes`                               |
+| POST   | `/api/organizacoes`                               |
+| DELETE | `/api/organizacoes/{id}`                          |
+| GET    | `/api/organizacoes/{id}/membros`                  |
+| DELETE | `/api/organizacoes/{id}/membros/{usuario_id}`     |
+| GET    | `/api/organizacoes/{id}/convites`                 |
+| POST   | `/api/organizacoes/{id}/convites`                 |
+| DELETE | `/api/organizacoes/{id}/convites/{convite_id}`    |
+| GET    | `/api/organizacoes/{id}/conexoes`                 |
+| POST   | `/api/organizacoes/{id}/conexoes`                 |
+| POST   | `/api/organizacoes/{id}/conexoes/{cid}/verificar` |
+| DELETE | `/api/organizacoes/{id}/conexoes/{cid}`           |
 
-Menos o `/health`, todas exigem o header `Authorization: Bearer <token>`.
+Menos `/health` e `/ready`, todas pedem `Authorization: Bearer <token>`.
+
+Dá para convidar quem ainda não tem conta: o convite fica guardado e a pessoa
+entra na organização quando se cadastrar.
 
 ## O que falta
 
-- [ ] Conectar um banco externo do usuário, além das tabelas do Supabase
-- [ ] Filtros e agrupamento por período nos indicadores
-- [ ] Gráficos, hoje o dashboard só mostra o número
+- [ ] Ler os metadados da tabela fato e sugerir métricas e dimensões
+- [ ] Definição de KPIs e de campos calculados
+- [ ] Dashboards com os indicadores da organização
