@@ -3,7 +3,10 @@
 
 create schema if not exists exemplo;
 
--- Deixa a geração repetível: rodar duas vezes dá a mesma base.
+begin;
+
+-- A base é refeita a cada execução e termina sempre na data de hoje, então os
+-- números mudam de um dia para o outro. O setseed só reduz a variação.
 select setseed(0.42);
 
 drop table if exists exemplo.vendas;
@@ -25,7 +28,8 @@ create table exemplo.vendas (
   vendida_em       date not null
 );
 
--- Uma linha por venda: é o que faz "ticket médio" ser a média de valor_total.
+-- Grão: uma linha é uma venda. Por isso "ticket médio" é a média de valor_total.
+-- O pedido_id é o número do pedido, único por construção; o id é a chave técnica.
 insert into exemplo.vendas
   (pedido_id, cliente_id, produto, categoria, regiao, canal, vendedor,
    forma_pagamento, quantidade, valor_unitario, custo_unitario, desconto,
@@ -142,3 +146,6 @@ alter role demo_leitor with password :'senha';
 revoke all on schema public from demo_leitor;
 grant usage on schema exemplo to demo_leitor;
 grant select on all tables in schema exemplo to demo_leitor;
+alter default privileges in schema exemplo grant select on tables to demo_leitor;
+
+commit;

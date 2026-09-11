@@ -107,6 +107,7 @@ migracoes:
 
 exemplo:
 	@$(call CARREGAR,$(ENV_BACK)); \
+	[ -n "$${DEMO_LEITOR_PASSWORD:-}" ] || { echo "falta DEMO_LEITOR_PASSWORD em $(ENV_BACK)"; exit 1; }; \
 	psql "$$MIGRATIONS_DATABASE_URL" -q -v ON_ERROR_STOP=1 \
 	  -v senha="$$DEMO_LEITOR_PASSWORD" -f supabase/exemplo.sql
 	@echo "base de exemplo criada em exemplo.vendas"
