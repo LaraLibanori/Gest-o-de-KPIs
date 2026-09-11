@@ -241,6 +241,7 @@ class Indicador(Base):
             " ('sempre', 'ultimos_7_dias', 'ultimos_30_dias', 'ultimos_90_dias', 'ano_atual')",
             name="indicadores_periodo_check",
         ),
+        sa.Index("indicadores_nome_unico", "conexao_id", "nome", unique=True),
     )
 
     id: Mapped[UUID] = mapped_column(
