@@ -39,7 +39,9 @@ def upgrade() -> None:
         sa.Column("cardinalidade", sa.BigInteger(), nullable=True),
         sa.Column("papel", sa.Text(), nullable=False),
         sa.Column("rotulo", sa.Text(), nullable=True),
-        sa.Column("confirmado", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "confirmado", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
         sa.Column("ordem", sa.Integer(), nullable=False),
         sa.CheckConstraint(f"papel in {PAPEIS}", name="catalogo_campos_papel_check"),
         sa.ForeignKeyConstraint(["conexao_id"], ["conexoes.id"], ondelete="CASCADE"),
