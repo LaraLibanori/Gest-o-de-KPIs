@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -126,6 +126,9 @@ class Conexao(Base):
     usuario: Mapped[str] = mapped_column(Text)
     senha_cifrada: Mapped[str] = mapped_column(Text)
     tabela_fato: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tabela_tipo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    descricao_negocio: Mapped[str | None] = mapped_column(Text, nullable=True)
+    etapa: Mapped[str] = mapped_column(Text, server_default="pronta")
     verificada_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -136,3 +139,29 @@ class Conexao(Base):
     criada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+# Uma coluna da tabela fato, com o papel que ela cumpre no indicador.
+class Campo(Base):
+    __tablename__ = "catalogo_campos"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "papel in ('metrica', 'dimensao', 'tempo', 'ignorar')",
+            name="catalogo_campos_papel_check",
+        ),
+        sa.Index("catalogo_campos_unico", "conexao_id", "coluna", unique=True),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    conexao_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("conexoes.id", ondelete="CASCADE")
+    )
+    coluna: Mapped[str] = mapped_column(Text)
+    tipo: Mapped[str] = mapped_column(Text)
+    cardinalidade: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    papel: Mapped[str] = mapped_column(Text)
+    rotulo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmado: Mapped[bool] = mapped_column(Boolean, server_default=sa.false())
+    ordem: Mapped[int] = mapped_column(Integer)

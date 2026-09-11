@@ -49,7 +49,11 @@ organizacoes           o espaço compartilhado
 organizacao_membros    quem participa de qual organização
 convites               quem foi convidado e ainda não tem conta
 conexoes               bancos da empresa, com a senha cifrada
+catalogo_campos        colunas da tabela fato e o papel de cada uma
 ```
+
+O schema `exemplo` tem uma base fictícia que faz o papel de banco do cliente,
+com um usuário de leitura à parte. `make exemplo` cria.
 
 Tudo pendura na organização, não no usuário. É assim que duas pessoas veem os
 mesmos dados.
@@ -115,6 +119,7 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `APP_SECRET_KEY`                | cifra a senha de cada conexão       |
 | backend  | `MIGRATIONS_DATABASE_URL`       | só para o Alembic, fica na máquina  |
 | backend  | `KPI_APP_PASSWORD`              | só para a migration que cria o usuário do banco |
+| backend  | `DEMO_LEITOR_PASSWORD`          | só para criar a base de exemplo |
 
 As duas últimas não vão para a Vercel.
 
@@ -141,7 +146,11 @@ administrador, e as políticas de RLS filtram as linhas pelo usuário da sessão
 | DELETE | `/api/organizacoes/{id}/convites/{convite_id}`    |
 | GET    | `/api/organizacoes/{id}/conexoes`                 |
 | POST   | `/api/organizacoes/{id}/conexoes`                 |
+| PATCH  | `/api/organizacoes/{id}/conexoes/{cid}`           |
 | POST   | `/api/organizacoes/{id}/conexoes/{cid}/verificar` |
+| GET    | `/api/organizacoes/{id}/conexoes/{cid}/catalogo`  |
+| POST   | `/api/organizacoes/{id}/conexoes/{cid}/catalogo`  |
+| PATCH  | `/api/.../catalogo/{campo}`                       |
 | DELETE | `/api/organizacoes/{id}/conexoes/{cid}`           |
 
 Menos `/health` e `/ready`, todas pedem `Authorization: Bearer <token>`.
@@ -151,6 +160,8 @@ entra na organização quando se cadastrar.
 
 ## O que falta
 
-- [ ] Ler os metadados da tabela fato e sugerir métricas e dimensões
+- [x] Ler os metadados da tabela fato e sugerir métricas e dimensões
+- [ ] Assistente em etapas para cadastrar a conexão
+- [ ] Sugestão de rótulo e papel por LLM
 - [ ] Definição de KPIs e de campos calculados
 - [ ] Dashboards com os indicadores da organização

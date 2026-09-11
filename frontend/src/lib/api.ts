@@ -72,9 +72,34 @@ export type Conexao = {
   banco: string;
   usuario: string;
   tabela_fato: string | null;
+  tabela_tipo: string | null;
+  descricao_negocio: string | null;
+  etapa: "tabela" | "negocio" | "catalogo" | "pronta";
   verificada_em: string | null;
   verificacao_erro: string | null;
   criada_em: string;
 };
 
-export type Verificacao = { ok: boolean; erro: string | null; tabelas: string[] };
+export type Relacao = {
+  nome: string;
+  tipo: "tabela" | "view" | "view materializada";
+};
+
+export type Verificacao = {
+  ok: boolean;
+  erro: string | null;
+  relacoes: Relacao[];
+};
+
+export type PapelCampo = "metrica" | "dimensao" | "tempo" | "ignorar";
+
+export type Campo = {
+  id: string;
+  coluna: string;
+  tipo: string;
+  cardinalidade: number | null;
+  papel: PapelCampo;
+  rotulo: string | null;
+  confirmado: boolean;
+  ordem: number;
+};

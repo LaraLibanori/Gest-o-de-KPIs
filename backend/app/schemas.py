@@ -88,12 +88,46 @@ class Conexao(BaseModel):
     banco: str
     usuario: str
     tabela_fato: str | None
+    tabela_tipo: str | None
+    descricao_negocio: str | None
+    etapa: str
     verificada_em: datetime | None
     verificacao_erro: str | None
     criada_em: datetime
 
 
+class Relacao(BaseModel):
+    nome: str
+    tipo: Literal["tabela", "view", "view materializada"]
+
+
 class Verificacao(BaseModel):
     ok: bool
     erro: str | None = None
-    tabelas: list[str] = []
+    relacoes: list[Relacao] = []
+
+
+class ConexaoEtapa(BaseModel):
+    tabela_fato: str | None = Field(default=None, max_length=200)
+    tabela_tipo: str | None = Field(default=None, max_length=40)
+    descricao_negocio: str | None = Field(default=None, max_length=500)
+    etapa: Literal["tabela", "negocio", "catalogo", "pronta"] | None = None
+
+
+class Campo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    coluna: str
+    tipo: str
+    cardinalidade: int | None
+    papel: Literal["metrica", "dimensao", "tempo", "ignorar"]
+    rotulo: str | None
+    confirmado: bool
+    ordem: int
+
+
+class CampoIn(BaseModel):
+    papel: Literal["metrica", "dimensao", "tempo", "ignorar"] | None = None
+    rotulo: str | None = Field(default=None, max_length=120)
+    confirmado: bool | None = None

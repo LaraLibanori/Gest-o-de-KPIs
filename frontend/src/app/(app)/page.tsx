@@ -156,7 +156,8 @@ export default function Conexoes() {
         `/organizacoes/${aberta.id}/conexoes/${conexao.id}/verificar`,
         { method: "POST" },
       );
-      if (r.ok) toast.success(`${conexao.nome} respondeu. ${r.tabelas.length} tabelas.`);
+      if (r.ok)
+        toast.success(`${conexao.nome} respondeu. ${r.relacoes.length} tabelas.`);
       else toast.error(r.erro ?? "o banco não respondeu");
       carregar(aberta.id);
     } catch (e) {
