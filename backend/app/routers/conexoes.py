@@ -13,6 +13,7 @@ from ..introspeccao import ler_catalogo, listar_relacoes
 from ..models import Campo as CampoDb
 from ..models import Conexao as ConexaoDb
 from ..permissoes import exigir_dono, papel
+from ..rede import RedeInterna, conferir
 from ..schemas import (
     Campo,
     CampoIn,
@@ -28,6 +29,7 @@ TEMPO_LIMITE = 8
 
 
 async def _abrir(conexao: ConexaoDb) -> asyncpg.Connection:
+    await conferir(conexao.host)
     return await asyncio.wait_for(
         asyncpg.connect(
             host=conexao.host,
@@ -114,6 +116,8 @@ async def verificar(
             relacoes = await listar_relacoes(externa)
         finally:
             await externa.close()
+    except RedeInterna as e:
+        erro = str(e)
     except TimeoutError:
         erro = f"o banco não respondeu em {TEMPO_LIMITE} segundos"
     except OSError:
@@ -174,6 +178,8 @@ async def montar_catalogo(
             campos = await ler_catalogo(externa, conexao.tabela_fato)
         finally:
             await externa.close()
+    except RedeInterna as e:
+        raise HTTPException(400, str(e)) from None
     except TimeoutError:
         raise HTTPException(504, "o banco não respondeu a tempo") from None
     except OSError:

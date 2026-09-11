@@ -6,6 +6,9 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 # Chave Fernet que cifra a senha do banco de cada conexao.
 APP_SECRET_KEY = os.environ.get("APP_SECRET_KEY", "")
 
+# So para desenvolvimento, quando o banco de teste roda na propria maquina.
+PERMITIR_REDE_INTERNA = os.environ.get("PERMITIR_REDE_INTERNA") == "1"
+
 # O alembic precisa de conexao de sessao, na porta 5432.
 MIGRATIONS_DATABASE_URL = os.environ.get("MIGRATIONS_DATABASE_URL", "") or DATABASE_URL
 

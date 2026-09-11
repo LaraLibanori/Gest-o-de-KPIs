@@ -110,6 +110,10 @@ class Convite(Base):
 class Conexao(Base):
     __tablename__ = "conexoes"
     __table_args__ = (
+        sa.CheckConstraint(
+            "etapa in ('tabela', 'negocio', 'catalogo', 'pronta')",
+            name="conexoes_etapa_check",
+        ),
         sa.Index("conexoes_nome_unico", "organizacao_id", "nome", unique=True),
     )
 

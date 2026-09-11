@@ -34,13 +34,13 @@ VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a
 
 .PHONY: ajuda env-init instalar dev dev-front dev-back checar checar-front checar-back \
-	env env-front env-back migrar migracao migracoes exemplo testes preview producao testar portas limpar
+	env env-front env-back migrar migracao migracoes exemplo testes lint preview producao testar portas limpar
 
 ajuda:
 	@echo "make env-init   cria os .env a partir dos exemplos"
 	@echo "make instalar   instala as dependencias do front e do back"
 	@echo "make dev        sobe os dois locais (front :$(PORTA_FRONT), back :$(PORTA_BACK))"
-	@echo "make checar     confere se tudo compila, igual ao CI"
+	@echo "make checar     lint, typecheck e build, igual ao CI"
 	@echo "make testes     roda os testes do backend (precisa de um Postgres vazio)"
 	@echo "make migrar     aplica as migrations pendentes no banco"
 	@echo "make migracao m=\"texto\"   cria uma migration a partir do models.py"
@@ -61,10 +61,10 @@ instalar:
 	cd frontend && npm install
 	@if command -v uv >/dev/null 2>&1; then \
 	  uv venv backend/.venv; \
-	  uv pip install --python "$(PY)" -r backend/requirements.txt; \
+	  uv pip install --python "$(PY)" -r backend/requirements.txt -r backend/requirements-dev.txt; \
 	else \
 	  $(PYTHON) -m venv backend/.venv; \
-	  "$(PY)" -m pip install -r backend/requirements.txt; \
+	  "$(PY)" -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt; \
 	fi
 
 # O Next le o frontend/.env.local sozinho; o uvicorn precisa carregar.
@@ -115,7 +115,11 @@ exemplo:
 testes:
 	cd backend && "$(PY)" -m pytest -q
 
-checar: checar-front checar-back
+checar: lint checar-front checar-back
+
+lint:
+	cd backend && "$(PY)" -m ruff check app alembic tests
+	cd backend && "$(PY)" -m ruff format --check app alembic tests
 
 # Build antes do tsc: e ele que regenera o .next/types.
 checar-front:

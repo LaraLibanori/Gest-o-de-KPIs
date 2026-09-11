@@ -26,17 +26,19 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
-// O detalhe cru do backend não serve para o usuário final.
+// O backend escreve o detalhe em português; só escondo onde ele não ajuda.
+const GENERICO: Record<number, string> = {
+  401: "sessão expirada, faça login de novo",
+  403: "você não tem permissão para isso",
+  404: "não encontrado",
+  422: "confira os dados preenchidos",
+};
+
 async function mensagem(res: Response): Promise<string> {
-  if (res.status === 401) return "sessão expirada, faça login de novo";
-  if (res.status === 403) return "você não tem permissão para isso";
-  if (res.status === 404) return "não encontrado";
-  if (res.status === 409) {
-    const corpo = await res.json().catch(() => null);
-    return typeof corpo?.detail === "string" ? corpo.detail : "conflito";
-  }
-  if (res.status === 422) return "confira os dados preenchidos";
-  return "não foi possível completar a ação";
+  if (res.status === 401 || res.status === 422) return GENERICO[res.status];
+  const corpo = await res.json().catch(() => null);
+  if (typeof corpo?.detail === "string") return corpo.detail;
+  return GENERICO[res.status] ?? "não foi possível completar a ação";
 }
 
 export type Papel = "dono" | "membro";

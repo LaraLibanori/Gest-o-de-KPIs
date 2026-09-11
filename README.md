@@ -120,6 +120,7 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `MIGRATIONS_DATABASE_URL`       | só para o Alembic, fica na máquina  |
 | backend  | `KPI_APP_PASSWORD`              | só para a migration que cria o usuário do banco |
 | backend  | `DEMO_LEITOR_PASSWORD`          | só para criar a base de exemplo |
+| backend  | `PERMITIR_REDE_INTERNA`         | só no local, para apontar o banco em localhost |
 
 As duas últimas não vão para a Vercel.
 
@@ -128,6 +129,9 @@ As duas últimas não vão para a Vercel.
 São duas camadas. Na aplicação, cada rota confere se você participa da
 organização. No banco, a API conecta com um usuário sem privilégio de
 administrador, e as políticas de RLS filtram as linhas pelo usuário da sessão.
+
+O host da conexão é digitado pelo usuário, então endereço de rede interna e
+localhost são recusados: sem isso daria para usar a API como sonda da rede.
 
 ## Endpoints
 
