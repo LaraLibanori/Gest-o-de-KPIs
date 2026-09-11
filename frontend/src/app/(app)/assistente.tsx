@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Database, Loader2, Sheet, Table2 } from "lucide-react";
+import { Check, Database, Loader2, Sheet, Sparkles, Table2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -9,6 +9,7 @@ import {
   type Conexao,
   type PapelCampo,
   type Relacao,
+  type Sugestao,
   type Verificacao,
 } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +95,7 @@ export default function Assistente({
   const [negocio, setNegocio] = useState("");
   const [campos, setCampos] = useState<Campo[]>([]);
   const [ocupado, setOcupado] = useState(false);
+  const [sugerindo, setSugerindo] = useState(false);
   const [mudou, setMudou] = useState(false);
 
   const base = `/organizacoes/${organizacaoId}/conexoes`;
@@ -183,6 +185,23 @@ export default function Assistente({
     }
   }
 
+  const sugerir = useCallback(
+    async (id: string) => {
+      setSugerindo(true);
+      try {
+        const r = await api<Sugestao>(`${base}/${id}/catalogo/rotulos`, {
+          method: "POST",
+        });
+        if (r.aplicadas > 0) setCampos(r.campos);
+      } catch {
+        // sem sugestao o catalogo por regra continua valendo
+      } finally {
+        setSugerindo(false);
+      }
+    },
+    [base],
+  );
+
   async function salvarNegocio(e: React.FormEvent) {
     e.preventDefault();
     if (!atual || ocupado) return;
@@ -194,6 +213,7 @@ export default function Assistente({
       });
       setCampos(await api<Campo[]>(`${base}/${atual.id}/catalogo`, { method: "POST" }));
       setEtapa("catalogo");
+      sugerir(atual.id);
     } catch (err) {
       falhar(err);
     } finally {
@@ -428,6 +448,12 @@ export default function Assistente({
                   <span className="font-mono">{atual?.tabela_fato}</span> ·{" "}
                   {contagem("metrica")} métricas, {contagem("dimensao")} dimensões,{" "}
                   {contagem("tempo")} de tempo
+                  {sugerindo && (
+                    <span className="ml-2 inline-flex items-center gap-1">
+                      <Sparkles className="size-3 animate-pulse" />
+                      sugerindo nomes
+                    </span>
+                  )}
                 </>
               )}
             </div>
@@ -440,8 +466,11 @@ export default function Assistente({
                       className="flex items-center gap-3 rounded-md border p-2 pl-3"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-mono text-sm">{c.coluna}</p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="truncate text-sm">
+                          {c.rotulo ?? <span className="font-mono">{c.coluna}</span>}
+                        </p>
+                        <p className="text-muted-foreground truncate text-xs">
+                          {c.rotulo && <span className="font-mono">{c.coluna} · </span>}
                           {c.tipo}
                           {c.cardinalidade !== null &&
                             ` · ${c.cardinalidade.toLocaleString("pt-BR")} valores`}

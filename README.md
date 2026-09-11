@@ -121,6 +121,8 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `KPI_APP_PASSWORD`              | só para a migration que cria o usuário do banco |
 | backend  | `DEMO_LEITOR_PASSWORD`          | só para criar a base de exemplo |
 | backend  | `PERMITIR_REDE_INTERNA`         | só no local, para apontar o banco em localhost |
+| backend  | `CEREBRAS_API_KEY`              | sugestão de rótulo no catálogo |
+| backend  | `GROQ_API_KEY`                  | o mesmo, como segunda opção |
 
 As duas últimas não vão para a Vercel.
 
@@ -132,6 +134,9 @@ administrador, e as políticas de RLS filtram as linhas pelo usuário da sessão
 
 O host da conexão é digitado pelo usuário, então endereço de rede interna e
 localhost são recusados: sem isso daria para usar a API como sonda da rede.
+
+A sugestão de rótulo manda para o modelo só nome, tipo e quantidade de valores
+distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 
 ## Endpoints
 
@@ -166,6 +171,6 @@ entra na organização quando se cadastrar.
 
 - [x] Ler os metadados da tabela fato e sugerir métricas e dimensões
 - [x] Assistente em etapas para cadastrar a conexão
-- [ ] Sugestão de rótulo e papel por LLM
+- [x] Sugestão de rótulo e papel por LLM
 - [ ] Definição de KPIs e de campos calculados
 - [ ] Dashboards com os indicadores da organização

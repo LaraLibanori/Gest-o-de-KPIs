@@ -95,6 +95,8 @@ export type Verificacao = {
 
 export type PapelCampo = "metrica" | "dimensao" | "tempo" | "ignorar";
 
+export type Sugestao = { aplicadas: number; campos: Campo[] };
+
 export type Campo = {
   id: string;
   coluna: string;

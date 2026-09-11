@@ -28,7 +28,7 @@ VERCEL := vercel --scope $(ESCOPO)
 
 # O que precisa estar cadastrado na Vercel para o deploy funcionar.
 VARS_FRONT := NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY
-VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY
+VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY CEREBRAS_API_KEY GROQ_API_KEY
 
 # Le o arquivo de ambiente ignorando o \r que o Windows deixa no fim da linha.
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a

@@ -127,6 +127,11 @@ class Campo(BaseModel):
     ordem: int
 
 
+class Sugestao(BaseModel):
+    aplicadas: int
+    campos: list["Campo"]
+
+
 class CampoIn(BaseModel):
     papel: Literal["metrica", "dimensao", "tempo", "ignorar"] | None = None
     rotulo: str | None = Field(default=None, max_length=120)

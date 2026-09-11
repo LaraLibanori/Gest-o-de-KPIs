@@ -10,6 +10,7 @@ from ..auth import CurrentUser
 from ..cripto import cifrar, decifrar
 from ..db import Sessao
 from ..introspeccao import ler_catalogo, listar_relacoes
+from ..llm import sugerir
 from ..models import Campo as CampoDb
 from ..models import Conexao as ConexaoDb
 from ..permissoes import exigir_dono, papel
@@ -20,6 +21,7 @@ from ..schemas import (
     Conexao,
     ConexaoEtapa,
     ConexaoIn,
+    Sugestao,
     Verificacao,
 )
 
@@ -197,6 +199,47 @@ async def montar_catalogo(
         select(CampoDb).where(CampoDb.conexao_id == conexao_id).order_by(CampoDb.ordem)
     )
     resposta = [Campo.model_validate(c) for c in linhas]
+    await sessao.commit()
+    return resposta
+
+
+# Sugestao de rotulo e papel. So mexe no que o usuario ainda nao confirmou.
+@router.post("/{conexao_id}/catalogo/rotulos", response_model=Sugestao)
+async def sugerir_rotulos(
+    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "sugerir rótulos")
+    conexao = await _buscar(sessao, organizacao_id, conexao_id)
+    campos = list(
+        await sessao.scalars(
+            select(CampoDb)
+            .where(CampoDb.conexao_id == conexao_id)
+            .order_by(CampoDb.ordem)
+        )
+    )
+
+    sugestoes = await sugerir(
+        [
+            {"coluna": c.coluna, "tipo": c.tipo, "cardinalidade": c.cardinalidade}
+            for c in campos
+        ],
+        conexao.tabela_fato or "",
+        conexao.descricao_negocio,
+    )
+
+    aplicadas = 0
+    for campo in campos:
+        sugestao = sugestoes.get(campo.coluna)
+        if not sugestao or campo.confirmado:
+            continue
+        campo.rotulo = sugestao.rotulo
+        campo.papel = sugestao.papel
+        aplicadas += 1
+
+    await sessao.flush()
+    resposta = Sugestao(
+        aplicadas=aplicadas, campos=[Campo.model_validate(c) for c in campos]
+    )
     await sessao.commit()
     return resposta
 
