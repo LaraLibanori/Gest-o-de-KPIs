@@ -27,14 +27,28 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      MIGRATIONS_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      KPI_APP_PASSWORD: senha-de-teste
+      APP_SECRET_KEY: tNJCGQ4WbxI1PD7mQOiae-rz3HtcFeZR7NL9q5U8tTA=
+      SUPABASE_URL: https://exemplo.supabase.co
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r requirements.txt ruff
-      - run: ruff check app alembic
-      - run: ruff format --check app alembic
-      - run: python -c "import app.main"
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: ruff check app alembic tests
+      - run: ruff format --check app alembic tests
+      - run: python -m pytest -q

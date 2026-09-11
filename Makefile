@@ -34,13 +34,14 @@ VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a
 
 .PHONY: ajuda env-init instalar dev dev-front dev-back checar checar-front checar-back \
-	env env-front env-back migrar migracao migracoes preview producao testar portas limpar
+	env env-front env-back migrar migracao migracoes testes preview producao testar portas limpar
 
 ajuda:
 	@echo "make env-init   cria os .env a partir dos exemplos"
 	@echo "make instalar   instala as dependencias do front e do back"
 	@echo "make dev        sobe os dois locais (front :$(PORTA_FRONT), back :$(PORTA_BACK))"
 	@echo "make checar     confere se tudo compila, igual ao CI"
+	@echo "make testes     roda os testes do backend (precisa de um Postgres vazio)"
 	@echo "make migrar     aplica as migrations pendentes no banco"
 	@echo "make migracao m=\"texto\"   cria uma migration a partir do models.py"
 	@echo "make migracoes  mostra a migration atual e o historico"
@@ -102,6 +103,11 @@ migracao:
 migracoes:
 	@$(call CARREGAR,$(ENV_BACK)); \
 	cd backend && "$(PY)" -m alembic current && "$(PY)" -m alembic history
+
+# Sobe um Postgres vazio antes:
+# docker run -d -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
+testes:
+	cd backend && "$(PY)" -m pytest -q
 
 checar: checar-front checar-back
 

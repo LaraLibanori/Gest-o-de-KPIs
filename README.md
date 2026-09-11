@@ -74,6 +74,14 @@ Para conferir se compila, o mesmo que roda no CI:
 make checar
 ```
 
+Os testes cobrem o que mais importa: que uma pessoa não veja os dados da outra.
+Precisam de um Postgres vazio à parte.
+
+```bash
+docker run -d -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
+make testes
+```
+
 ## Migrations
 
 O banco é descrito em `backend/app/models.py` e versionado pelo Alembic.
