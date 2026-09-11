@@ -9,6 +9,7 @@ from ..models import Convite as ConviteDb
 from ..models import Membro as MembroDb
 from ..models import Organizacao as OrganizacaoDb
 from ..models import Perfil as PerfilDb
+from ..permissoes import exigir_dono
 from ..permissoes import papel as _papel
 from ..schemas import Convite, ConviteIn, Membro, Organizacao, OrganizacaoIn
 
@@ -47,8 +48,7 @@ async def criar(body: OrganizacaoIn, user: CurrentUser, sessao: Sessao):
 
 @router.delete("/{organizacao_id}", status_code=204)
 async def remover(organizacao_id: UUID, user: CurrentUser, sessao: Sessao):
-    if await _papel(sessao, organizacao_id, user.id) != "dono":
-        raise HTTPException(403, "só o dono pode apagar a organização")
+    await exigir_dono(sessao, organizacao_id, user.id, "apagar a organização")
     await sessao.execute(
         delete(OrganizacaoDb).where(OrganizacaoDb.id == organizacao_id)
     )
@@ -100,8 +100,7 @@ async def listar_convites(organizacao_id: UUID, user: CurrentUser, sessao: Sessa
 async def convidar(
     organizacao_id: UUID, body: ConviteIn, user: CurrentUser, sessao: Sessao
 ):
-    if await _papel(sessao, organizacao_id, user.id) != "dono":
-        raise HTTPException(403, "só o dono pode convidar")
+    await exigir_dono(sessao, organizacao_id, user.id, "convidar")
 
     email = body.email.lower()
     convidado = await sessao.scalar(
@@ -165,8 +164,7 @@ async def convidar(
 async def cancelar_convite(
     organizacao_id: UUID, convite_id: UUID, user: CurrentUser, sessao: Sessao
 ):
-    if await _papel(sessao, organizacao_id, user.id) != "dono":
-        raise HTTPException(403, "só o dono pode cancelar convite")
+    await exigir_dono(sessao, organizacao_id, user.id, "cancelar convite")
     resultado = await sessao.execute(
         delete(ConviteDb).where(
             ConviteDb.id == convite_id, ConviteDb.organizacao_id == organizacao_id
