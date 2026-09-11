@@ -22,8 +22,7 @@ os.environ["DATABASE_URL"] = APP
 os.environ.setdefault("SUPABASE_URL", "https://exemplo.supabase.co")
 os.environ.setdefault("APP_SECRET_KEY", "tNJCGQ4WbxI1PD7mQOiae-rz3HtcFeZR7NL9q5U8tTA=")
 
-# O Supabase traz o schema auth pronto. No banco de teste ele é criado à mão,
-# com o mínimo que as migrations usam.
+# No Supabase o schema auth ja existe; aqui ele e criado a mao.
 STUB = """
 drop schema if exists public cascade;
 create schema public;

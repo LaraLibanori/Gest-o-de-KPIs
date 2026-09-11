@@ -104,8 +104,7 @@ migracoes:
 	@$(call CARREGAR,$(ENV_BACK)); \
 	cd backend && "$(PY)" -m alembic current && "$(PY)" -m alembic history
 
-# Sobe um Postgres vazio antes:
-# docker run -d -e POSTGRES_PASSWORD=postgres -p 55432:5432 postgres:16
+# Precisa de um Postgres vazio na 55432, veja o README.
 testes:
 	cd backend && "$(PY)" -m pytest -q
 
