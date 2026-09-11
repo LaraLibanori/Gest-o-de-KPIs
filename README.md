@@ -121,7 +121,7 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `KPI_APP_PASSWORD`              | só para a migration que cria o usuário do banco |
 | backend  | `DEMO_LEITOR_PASSWORD`          | só para criar a base de exemplo |
 | backend  | `PERMITIR_REDE_INTERNA`         | só no local, para apontar o banco em localhost |
-| backend  | `CEREBRAS_API_KEY`              | sugestão de rótulo no catálogo |
+| backend  | `OPENROUTER_API_KEY`            | sugestão de rótulo no catálogo |
 | backend  | `GROQ_API_KEY`                  | o mesmo, como segunda opção |
 
 As duas últimas não vão para a Vercel.
