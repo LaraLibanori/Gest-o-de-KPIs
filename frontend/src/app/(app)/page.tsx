@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { api, type Conexao, type Verificacao } from "@/lib/api";
 import { useOrganizacao } from "./contexto";
+import Assistente from "./assistente";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,14 +37,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -57,19 +50,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const VAZIA = {
-  nome: "",
-  host: "",
-  porta: "5432",
-  banco: "",
-  usuario: "",
-  senha: "",
-  tabela_fato: "",
-};
 
 function quando(iso: string | null) {
   if (!iso) return "nunca verificada";
@@ -80,7 +61,8 @@ function quando(iso: string | null) {
 }
 
 function Situacao({ conexao }: { conexao: Conexao }) {
-  if (!conexao.verificada_em) return <Badge variant="outline">não verificada</Badge>;
+  if (conexao.etapa !== "pronta")
+    return <Badge variant="outline">configuração incompleta</Badge>;
   if (conexao.verificacao_erro)
     return (
       <Badge variant="destructive">
@@ -100,9 +82,9 @@ export default function Conexoes() {
   const { aberta, carregando: carregandoOrg } = useOrganizacao();
   const [conexoes, setConexoes] = useState<Conexao[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [form, setForm] = useState(VAZIA);
-  const [dialogo, setDialogo] = useState(false);
-  const [salvando, setSalvando] = useState(false);
+  const [assistente, setAssistente] = useState<{ ativo: boolean; alvo: Conexao | null }>(
+    { ativo: false, alvo: null },
+  );
   const [verificando, setVerificando] = useState<string | null>(null);
   const [apagando, setApagando] = useState<Conexao | null>(null);
 
@@ -123,30 +105,6 @@ export default function Conexoes() {
     if (aberta) carregar(aberta.id);
     else if (!carregandoOrg) setCarregando(false);
   }, [aberta, carregandoOrg, carregar]);
-
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!aberta || salvando) return;
-    setSalvando(true);
-    try {
-      const nova = await api<Conexao>(`/organizacoes/${aberta.id}/conexoes`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...form,
-          porta: Number(form.porta),
-          tabela_fato: form.tabela_fato || null,
-        }),
-      });
-      setConexoes((lista) => [nova, ...lista]);
-      setForm(VAZIA);
-      setDialogo(false);
-      toast.success(`${nova.nome} cadastrada. Verifique para confirmar o acesso.`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "não foi possível salvar");
-    } finally {
-      setSalvando(false);
-    }
-  }
 
   async function verificar(conexao: Conexao) {
     if (!aberta) return;
@@ -182,6 +140,11 @@ export default function Conexoes() {
     }
   }
 
+  function fecharAssistente(mudou: boolean) {
+    setAssistente({ ativo: false, alvo: null });
+    if (mudou && aberta) carregar(aberta.id);
+  }
+
   const ocupado = carregandoOrg || carregando;
 
   return (
@@ -194,7 +157,7 @@ export default function Conexoes() {
           </p>
         </div>
         {souDono && conexoes.length > 0 && (
-          <Button onClick={() => setDialogo(true)}>
+          <Button onClick={() => setAssistente({ ativo: true, alvo: null })}>
             <Plus />
             Nova conexão
           </Button>
@@ -243,7 +206,7 @@ export default function Conexoes() {
           </EmptyHeader>
           <EmptyContent>
             {souDono ? (
-              <Button onClick={() => setDialogo(true)}>
+              <Button onClick={() => setAssistente({ ativo: true, alvo: null })}>
                 <Plus />
                 Adicionar conexão
               </Button>
@@ -282,19 +245,28 @@ export default function Conexoes() {
                   {quando(c.verificada_em)}
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => verificar(c)}
-                    disabled={verificando === c.id}
-                  >
-                    {verificando === c.id ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <RefreshCw />
-                    )}
-                    Verificar
-                  </Button>
+                  {souDono && c.etapa !== "pronta" ? (
+                    <Button
+                      size="sm"
+                      onClick={() => setAssistente({ ativo: true, alvo: c })}
+                    >
+                      Continuar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => verificar(c)}
+                      disabled={verificando === c.id}
+                    >
+                      {verificando === c.id ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <RefreshCw />
+                      )}
+                      Verificar
+                    </Button>
+                  )}
                   {souDono && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -308,6 +280,12 @@ export default function Conexoes() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => setAssistente({ ativo: true, alvo: c })}
+                        >
+                          <Table2 />
+                          Revisar campos
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           variant="destructive"
                           onSelect={() => setApagando(c)}
@@ -325,112 +303,14 @@ export default function Conexoes() {
         </div>
       )}
 
-      <Dialog open={dialogo} onOpenChange={setDialogo}>
-        <DialogContent className="sm:max-w-lg">
-          <form onSubmit={salvar}>
-            <DialogHeader>
-              <DialogTitle>Nova conexão</DialogTitle>
-              <DialogDescription>
-                A senha é guardada cifrada e nunca volta para a tela.
-              </DialogDescription>
-            </DialogHeader>
-
-            <FieldGroup className="my-6">
-              <Field>
-                <FieldLabel htmlFor="nome">Nome</FieldLabel>
-                <Input
-                  id="nome"
-                  placeholder="Produção"
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  maxLength={120}
-                  required
-                  autoFocus
-                />
-                <FieldDescription>Como você reconhece esse banco.</FieldDescription>
-              </Field>
-
-              <div className="grid grid-cols-[1fr_100px] gap-4">
-                <Field>
-                  <FieldLabel htmlFor="host">Host</FieldLabel>
-                  <Input
-                    id="host"
-                    placeholder="db.empresa.com"
-                    value={form.host}
-                    onChange={(e) => setForm({ ...form, host: e.target.value })}
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="porta">Porta</FieldLabel>
-                  <Input
-                    id="porta"
-                    type="number"
-                    value={form.porta}
-                    onChange={(e) => setForm({ ...form, porta: e.target.value })}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <FieldLabel htmlFor="banco">Banco</FieldLabel>
-                <Input
-                  id="banco"
-                  placeholder="postgres"
-                  value={form.banco}
-                  onChange={(e) => setForm({ ...form, banco: e.target.value })}
-                  required
-                />
-              </Field>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="usuario">Usuário</FieldLabel>
-                  <Input
-                    id="usuario"
-                    autoComplete="off"
-                    value={form.usuario}
-                    onChange={(e) => setForm({ ...form, usuario: e.target.value })}
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="senha">Senha</FieldLabel>
-                  <Input
-                    id="senha"
-                    type="password"
-                    autoComplete="new-password"
-                    value={form.senha}
-                    onChange={(e) => setForm({ ...form, senha: e.target.value })}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <FieldLabel htmlFor="tabela">Tabela fato</FieldLabel>
-                <Input
-                  id="tabela"
-                  placeholder="vendas"
-                  value={form.tabela_fato}
-                  onChange={(e) => setForm({ ...form, tabela_fato: e.target.value })}
-                />
-                <FieldDescription>
-                  Opcional agora. Dá para escolher depois de verificar a conexão.
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-
-            <DialogFooter>
-              <Button type="submit" disabled={salvando}>
-                {salvando && <Loader2 className="animate-spin" />}
-                Salvar conexão
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {aberta && (
+        <Assistente
+          organizacaoId={aberta.id}
+          conexao={assistente.alvo}
+          aberto={assistente.ativo}
+          onFechar={fecharAssistente}
+        />
+      )}
 
       <AlertDialog open={apagando !== null} onOpenChange={(o) => !o && setApagando(null)}>
         <AlertDialogContent>

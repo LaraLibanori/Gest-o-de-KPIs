@@ -161,7 +161,7 @@ entra na organização quando se cadastrar.
 ## O que falta
 
 - [x] Ler os metadados da tabela fato e sugerir métricas e dimensões
-- [ ] Assistente em etapas para cadastrar a conexão
+- [x] Assistente em etapas para cadastrar a conexão
 - [ ] Sugestão de rótulo e papel por LLM
 - [ ] Definição de KPIs e de campos calculados
 - [ ] Dashboards com os indicadores da organização
