@@ -1,5 +1,7 @@
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 import asyncpg
@@ -43,6 +45,28 @@ async def _abrir(conexao: ConexaoDb) -> asyncpg.Connection:
         ),
         timeout=TEMPO_LIMITE,
     )
+
+
+# Abre o banco da empresa, roda a tarefa e fecha, traduzindo a falha em HTTP.
+async def _consultar(conexao: ConexaoDb, tarefa: Callable[[asyncpg.Connection], Any]):
+    try:
+        externa = await _abrir(conexao)
+        try:
+            return await tarefa(externa)
+        finally:
+            await externa.close()
+    except RedeInterna as e:
+        raise HTTPException(400, str(e)) from None
+    except TimeoutError:
+        raise HTTPException(
+            504, f"o banco não respondeu em {TEMPO_LIMITE} segundos"
+        ) from None
+    except OSError:
+        raise HTTPException(502, "não foi possível alcançar o host informado") from None
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from None
+    except asyncpg.PostgresError as e:
+        raise HTTPException(502, str(e)) from None
 
 
 async def _buscar(sessao, organizacao_id: UUID, conexao_id: UUID) -> ConexaoDb:
@@ -113,19 +137,9 @@ async def verificar(
     relacoes: list[dict] = []
     erro: str | None = None
     try:
-        externa = await _abrir(conexao)
-        try:
-            relacoes = await listar_relacoes(externa)
-        finally:
-            await externa.close()
-    except RedeInterna as e:
-        erro = str(e)
-    except TimeoutError:
-        erro = f"o banco não respondeu em {TEMPO_LIMITE} segundos"
-    except OSError:
-        erro = "não foi possível alcançar o host informado"
-    except asyncpg.PostgresError as e:
-        erro = str(e)
+        relacoes = await _consultar(conexao, listar_relacoes)
+    except HTTPException as e:
+        erro = e.detail
 
     conexao.verificada_em = datetime.now(timezone.utc)
     conexao.verificacao_erro = erro
@@ -174,22 +188,9 @@ async def montar_catalogo(
     if not conexao.tabela_fato:
         raise HTTPException(409, "escolha a tabela fato antes")
 
-    try:
-        externa = await _abrir(conexao)
-        try:
-            campos = await ler_catalogo(externa, conexao.tabela_fato)
-        finally:
-            await externa.close()
-    except RedeInterna as e:
-        raise HTTPException(400, str(e)) from None
-    except TimeoutError:
-        raise HTTPException(504, "o banco não respondeu a tempo") from None
-    except OSError:
-        raise HTTPException(502, "não foi possível alcançar o host") from None
-    except ValueError as e:
-        raise HTTPException(404, str(e)) from None
-    except asyncpg.PostgresError as e:
-        raise HTTPException(502, str(e)) from None
+    campos = await _consultar(
+        conexao, lambda externa: ler_catalogo(externa, conexao.tabela_fato)
+    )
 
     await sessao.execute(delete(CampoDb).where(CampoDb.conexao_id == conexao_id))
     sessao.add_all([CampoDb(conexao_id=conexao_id, **c) for c in campos])
