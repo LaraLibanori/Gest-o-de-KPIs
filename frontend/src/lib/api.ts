@@ -76,7 +76,8 @@ export type Conexao = {
   tabela_fato: string | null;
   tabela_tipo: string | null;
   descricao_negocio: string | null;
-  etapa: "tabela" | "negocio" | "catalogo" | "pronta";
+  segmento: string | null;
+  etapa: "tabela" | "negocio" | "catalogo" | "indicadores" | "pronta";
   verificada_em: string | null;
   verificacao_erro: string | null;
   criada_em: string;
@@ -106,4 +107,71 @@ export type Campo = {
   rotulo: string | null;
   confirmado: boolean;
   ordem: number;
+};
+
+export type Segmento = { chave: string; nome: string };
+
+export type Agregacao =
+  "soma" | "media" | "contagem" | "distintos" | "minimo" | "maximo";
+
+export type Periodo =
+  | "sempre"
+  | "ultimos_7_dias"
+  | "ultimos_30_dias"
+  | "ultimos_90_dias"
+  | "ano_atual";
+
+export type Indicador = {
+  id: string;
+  nome: string;
+  agregacao: Agregacao;
+  coluna: string | null;
+  dimensao: string | null;
+  tempo: string | null;
+  periodo: Periodo | null;
+  origem: "regra" | "segmento" | "manual";
+  confirmado: boolean;
+  ordem: number;
+};
+
+export type Proposta = {
+  segmento: string | null;
+  indicadores: Indicador[];
+  descartados: { nome: string; motivo: string }[];
+};
+
+// Mesma lista do backend: qual papel de campo serve para cada conta.
+export const PAPEIS_ACEITOS: Record<Agregacao, PapelCampo[]> = {
+  soma: ["metrica"],
+  media: ["metrica"],
+  minimo: ["metrica"],
+  maximo: ["metrica"],
+  distintos: ["dimensao", "ignorar"],
+  contagem: [],
+};
+
+export const AGREGACOES: Record<Agregacao, string> = {
+  soma: "Soma",
+  media: "Média",
+  contagem: "Contagem",
+  distintos: "Quantidade de",
+  minimo: "Menor",
+  maximo: "Maior",
+};
+
+export const PERIODOS: Record<Periodo, string> = {
+  sempre: "todo o período",
+  ultimos_7_dias: "últimos 7 dias",
+  ultimos_30_dias: "últimos 30 dias",
+  ultimos_90_dias: "últimos 90 dias",
+  ano_atual: "ano atual",
+};
+
+export type IndicadorNovo = {
+  nome: string;
+  agregacao: Agregacao;
+  coluna: string | null;
+  dimensao: string | null;
+  tempo: string | null;
+  periodo: Periodo | null;
 };
