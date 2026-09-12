@@ -14,6 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { toast } from "sonner";
+import { falhar } from "@/lib/erros";
 import { api, type Organizacao } from "@/lib/api";
 import { OrganizacaoProvider } from "./contexto";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -82,7 +83,7 @@ export default function Shell({
           : (lista[0]?.id ?? null),
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível carregar");
+      falhar(e, "não foi possível carregar");
     } finally {
       setCarregando(false);
     }
@@ -114,9 +115,7 @@ export default function Shell({
       setDialogo(false);
       toast.success(`${nova.nome} criada`);
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "não foi possível criar",
-      );
+      falhar(err, "não foi possível criar");
     } finally {
       setCriando(false);
     }

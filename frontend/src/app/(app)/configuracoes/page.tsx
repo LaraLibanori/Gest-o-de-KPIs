@@ -3,20 +3,12 @@
 import { useState } from "react";
 import { Building2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { falhar } from "@/lib/erros";
 import { api } from "@/lib/api";
 import { useOrganizacao } from "../contexto";
 import Pessoas from "../pessoas";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import Confirmar from "@/components/confirmar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,7 +25,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -55,7 +52,7 @@ export default function Configuracoes() {
       toast.success(`${aberta.nome} apagada`);
       await recarregar();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível apagar");
+      falhar(e, "não foi possível apagar");
     } finally {
       setApagando(false);
     }
@@ -99,9 +96,13 @@ export default function Configuracoes() {
             <Card>
               <CardHeader>
                 <CardTitle>{aberta.nome}</CardTitle>
-                <CardDescription>criada em {data(aberta.criada_em)}</CardDescription>
+                <CardDescription>
+                  criada em {data(aberta.criada_em)}
+                </CardDescription>
                 <CardAction>
-                  <Badge variant={aberta.papel === "dono" ? "default" : "secondary"}>
+                  <Badge
+                    variant={aberta.papel === "dono" ? "default" : "secondary"}
+                  >
                     seu papel: {aberta.papel}
                   </Badge>
                 </CardAction>
@@ -111,10 +112,10 @@ export default function Configuracoes() {
             {aberta.papel === "dono" && (
               <Card className="border-destructive/40">
                 <CardHeader>
-                  <CardTitle className="text-destructive">Zona de risco</CardTitle>
-                  <CardDescription>
-                    Ações daqui não têm volta.
-                  </CardDescription>
+                  <CardTitle className="text-destructive">
+                    Zona de risco
+                  </CardTitle>
+                  <CardDescription>Ações daqui não têm volta.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Item variant="outline">
@@ -124,7 +125,10 @@ export default function Configuracoes() {
                         Remove a organização, seus membros, convites e conexões.
                       </ItemDescription>
                     </ItemContent>
-                    <Button variant="destructive" onClick={() => setApagando(true)}>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setApagando(true)}
+                    >
                       <Trash2 />
                       Apagar
                     </Button>
@@ -136,21 +140,13 @@ export default function Configuracoes() {
         </Tabs>
       )}
 
-      <AlertDialog open={apagando} onOpenChange={setApagando}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar {aberta?.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A organização, seus membros, convites e conexões são removidos. Não
-              dá para desfazer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={apagar}>Apagar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Confirmar
+        aberto={apagando}
+        titulo={`Apagar ${aberta?.nome}?`}
+        descricao="A organização, seus membros, convites e conexões são removidos. Não dá para desfazer."
+        onConfirmar={apagar}
+        onFechar={() => setApagando(false)}
+      />
     </div>
   );
 }

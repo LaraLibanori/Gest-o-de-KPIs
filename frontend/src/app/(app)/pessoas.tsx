@@ -3,19 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, MailPlus, MoreHorizontal, UserRoundX, X } from "lucide-react";
 import { toast } from "sonner";
+import { falhar } from "@/lib/erros";
 import { api, type Convite, type Membro, type Organizacao } from "@/lib/api";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import Confirmar from "@/components/confirmar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,7 +32,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -87,7 +84,7 @@ export default function Pessoas({
       setMembros(m);
       setConvites(c);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível carregar");
+      falhar(e, "não foi possível carregar");
     } finally {
       setCarregando(false);
     }
@@ -102,10 +99,13 @@ export default function Pessoas({
     if (convidando) return;
     setConvidando(true);
     try {
-      const convite = await api<Convite>(`/organizacoes/${organizacao.id}/convites`, {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      });
+      const convite = await api<Convite>(
+        `/organizacoes/${organizacao.id}/convites`,
+        {
+          method: "POST",
+          body: JSON.stringify({ email }),
+        },
+      );
       toast.success(
         convite.situacao === "membro"
           ? `${convite.email} entrou na organização`
@@ -115,7 +115,7 @@ export default function Pessoas({
       setAberto(false);
       carregar(organizacao.id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "não foi possível convidar");
+      falhar(err, "não foi possível convidar");
     } finally {
       setConvidando(false);
     }
@@ -129,10 +129,15 @@ export default function Pessoas({
         ? "Você perde o acesso a esta organização e precisa de um novo convite para voltar."
         : "Essa pessoa perde o acesso imediatamente. Dá para convidar de novo depois.",
       acao: async () => {
-        await api<void>(`/organizacoes/${organizacao.id}/membros/${membro.usuario_id}`, {
-          method: "DELETE",
-        });
-        setMembros((lista) => lista.filter((m) => m.usuario_id !== membro.usuario_id));
+        await api<void>(
+          `/organizacoes/${organizacao.id}/membros/${membro.usuario_id}`,
+          {
+            method: "DELETE",
+          },
+        );
+        setMembros((lista) =>
+          lista.filter((m) => m.usuario_id !== membro.usuario_id),
+        );
         toast.success(sou ? "Você saiu da organização" : "Pessoa removida");
       },
     });
@@ -141,11 +146,15 @@ export default function Pessoas({
   function pedirCancelamento(convite: Convite) {
     setAlvo({
       titulo: `Cancelar o convite de ${convite.email}?`,
-      descricao: "O convite deixa de valer. Você pode enviar outro quando quiser.",
+      descricao:
+        "O convite deixa de valer. Você pode enviar outro quando quiser.",
       acao: async () => {
-        await api<void>(`/organizacoes/${organizacao.id}/convites/${convite.id}`, {
-          method: "DELETE",
-        });
+        await api<void>(
+          `/organizacoes/${organizacao.id}/convites/${convite.id}`,
+          {
+            method: "DELETE",
+          },
+        );
         setConvites((lista) => lista.filter((c) => c.id !== convite.id));
         toast.success("Convite cancelado");
       },
@@ -157,15 +166,14 @@ export default function Pessoas({
     try {
       await alvo.acao();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível concluir");
+      falhar(e, "não foi possível concluir");
     } finally {
       setAlvo(null);
     }
   }
 
   const total = membros.length;
-  const resumo =
-    total === 1 ? "1 pessoa" : `${total} pessoas`;
+  const resumo = total === 1 ? "1 pessoa" : `${total} pessoas`;
 
   return (
     <>
@@ -191,10 +199,12 @@ export default function Pessoas({
                 <DialogContent className="sm:max-w-md">
                   <form onSubmit={convidar}>
                     <DialogHeader>
-                      <DialogTitle>Convidar para {organizacao.nome}</DialogTitle>
+                      <DialogTitle>
+                        Convidar para {organizacao.nome}
+                      </DialogTitle>
                       <DialogDescription>
-                        Quem já tem conta entra na hora. Quem não tem, entra assim
-                        que se cadastrar com esse e-mail.
+                        Quem já tem conta entra na hora. Quem não tem, entra
+                        assim que se cadastrar com esse e-mail.
                       </DialogDescription>
                     </DialogHeader>
                     <Field className="my-6">
@@ -256,7 +266,9 @@ export default function Pessoas({
                     {m.nome && <ItemDescription>{m.email}</ItemDescription>}
                   </ItemContent>
                   <ItemActions className="gap-2">
-                    <Badge variant={m.papel === "dono" ? "default" : "secondary"}>
+                    <Badge
+                      variant={m.papel === "dono" ? "default" : "secondary"}
+                    >
                       {m.papel}
                     </Badge>
                     {(souDono || m.email === meuEmail) && (
@@ -277,7 +289,9 @@ export default function Pessoas({
                             onSelect={() => pedirRemocao(m)}
                           >
                             <UserRoundX />
-                            {m.email === meuEmail ? "Sair da organização" : "Remover"}
+                            {m.email === meuEmail
+                              ? "Sair da organização"
+                              : "Remover"}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -332,18 +346,14 @@ export default function Pessoas({
         </CardContent>
       </Card>
 
-      <AlertDialog open={alvo !== null} onOpenChange={(o) => !o && setAlvo(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{alvo?.titulo}</AlertDialogTitle>
-            <AlertDialogDescription>{alvo?.descricao}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmar}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Confirmar
+        aberto={alvo !== null}
+        titulo={alvo?.titulo ?? ""}
+        descricao={alvo?.descricao ?? ""}
+        acao="Confirmar"
+        onConfirmar={confirmar}
+        onFechar={() => setAlvo(null)}
+      />
     </>
   );
 }

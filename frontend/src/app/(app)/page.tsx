@@ -13,20 +13,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { falhar } from "@/lib/erros";
 import { api, type Conexao, type Verificacao } from "@/lib/api";
 import { useOrganizacao } from "./contexto";
 import Assistente from "./assistente";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import Confirmar from "@/components/confirmar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -82,9 +74,10 @@ export default function Conexoes() {
   const { aberta, carregando: carregandoOrg } = useOrganizacao();
   const [conexoes, setConexoes] = useState<Conexao[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [assistente, setAssistente] = useState<{ ativo: boolean; alvo: Conexao | null }>(
-    { ativo: false, alvo: null },
-  );
+  const [assistente, setAssistente] = useState<{
+    ativo: boolean;
+    alvo: Conexao | null;
+  }>({ ativo: false, alvo: null });
   const [verificando, setVerificando] = useState<string | null>(null);
   const [apagando, setApagando] = useState<Conexao | null>(null);
 
@@ -93,9 +86,11 @@ export default function Conexoes() {
   const carregar = useCallback(async (organizacaoId: string) => {
     setCarregando(true);
     try {
-      setConexoes(await api<Conexao[]>(`/organizacoes/${organizacaoId}/conexoes`));
+      setConexoes(
+        await api<Conexao[]>(`/organizacoes/${organizacaoId}/conexoes`),
+      );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível carregar");
+      falhar(e, "não foi possível carregar");
     } finally {
       setCarregando(false);
     }
@@ -115,11 +110,13 @@ export default function Conexoes() {
         { method: "POST" },
       );
       if (r.ok)
-        toast.success(`${conexao.nome} respondeu. ${r.relacoes.length} tabelas.`);
+        toast.success(
+          `${conexao.nome} respondeu. ${r.relacoes.length} tabelas.`,
+        );
       else toast.error(r.erro ?? "o banco não respondeu");
       carregar(aberta.id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível verificar");
+      falhar(e, "não foi possível verificar");
     } finally {
       setVerificando(null);
     }
@@ -134,7 +131,7 @@ export default function Conexoes() {
       setConexoes((lista) => lista.filter((c) => c.id !== apagando.id));
       toast.success(`${apagando.nome} removida`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "não foi possível apagar");
+      falhar(e, "não foi possível apagar");
     } finally {
       setApagando(null);
     }
@@ -206,7 +203,9 @@ export default function Conexoes() {
           </EmptyHeader>
           <EmptyContent>
             {souDono ? (
-              <Button onClick={() => setAssistente({ ativo: true, alvo: null })}>
+              <Button
+                onClick={() => setAssistente({ ativo: true, alvo: null })}
+              >
                 <Plus />
                 Adicionar conexão
               </Button>
@@ -281,7 +280,9 @@ export default function Conexoes() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onSelect={() => setAssistente({ ativo: true, alvo: c })}
+                          onSelect={() =>
+                            setAssistente({ ativo: true, alvo: c })
+                          }
                         >
                           <Table2 />
                           Revisar campos
@@ -312,21 +313,13 @@ export default function Conexoes() {
         />
       )}
 
-      <AlertDialog open={apagando !== null} onOpenChange={(o) => !o && setApagando(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar {apagando?.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A credencial guardada é descartada. O banco da empresa não é
-              alterado, mas os indicadores que dependem dessa conexão param.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Voltar</AlertDialogCancel>
-            <AlertDialogAction onClick={apagar}>Apagar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Confirmar
+        aberto={apagando !== null}
+        titulo={`Apagar ${apagando?.nome}?`}
+        descricao="A credencial guardada é descartada. O banco da empresa não é alterado, mas os indicadores que dependem dessa conexão param."
+        onConfirmar={apagar}
+        onFechar={() => setApagando(null)}
+      />
     </div>
   );
 }

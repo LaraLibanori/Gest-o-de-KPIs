@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { falhar } from "@/lib/erros";
 import {
   api,
   type Campo,
@@ -86,9 +87,6 @@ export default function Assistente({
   const [mudou, setMudou] = useState(false);
 
   const base = `/organizacoes/${organizacaoId}/conexoes`;
-
-  const falhar = (e: unknown) =>
-    toast.error(e instanceof Error ? e.message : "não foi possível concluir");
 
   const buscarRelacoes = useCallback(
     async (id: string) => {
