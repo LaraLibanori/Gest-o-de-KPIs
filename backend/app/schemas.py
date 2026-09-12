@@ -90,6 +90,7 @@ class Conexao(BaseModel):
     tabela_fato: str | None
     tabela_tipo: str | None
     descricao_negocio: str | None
+    segmento: str | None
     etapa: str
     verificada_em: datetime | None
     verificacao_erro: str | None
@@ -111,7 +112,10 @@ class ConexaoEtapa(BaseModel):
     tabela_fato: str | None = Field(default=None, max_length=200)
     tabela_tipo: str | None = Field(default=None, max_length=40)
     descricao_negocio: str | None = Field(default=None, max_length=500)
-    etapa: Literal["tabela", "negocio", "catalogo", "pronta"] | None = None
+    segmento: str | None = Field(default=None, max_length=40)
+    etapa: Literal["tabela", "negocio", "catalogo", "indicadores", "pronta"] | None = (
+        None
+    )
 
 
 class Campo(BaseModel):
@@ -136,3 +140,61 @@ class CampoIn(BaseModel):
     papel: Literal["metrica", "dimensao", "tempo", "ignorar"] | None = None
     rotulo: str | None = Field(default=None, max_length=120)
     confirmado: bool | None = None
+
+
+AGREGACAO = Literal["soma", "media", "contagem", "distintos", "minimo", "maximo"]
+PERIODO = Literal[
+    "sempre", "ultimos_7_dias", "ultimos_30_dias", "ultimos_90_dias", "ano_atual"
+]
+
+
+class Segmento(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    chave: str
+    nome: str
+
+
+class Indicador(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    nome: str
+    agregacao: AGREGACAO
+    coluna: str | None
+    dimensao: str | None
+    tempo: str | None
+    periodo: PERIODO | None
+    origem: Literal["regra", "segmento", "manual"]
+    confirmado: bool
+    ordem: int
+
+
+class IndicadorIn(BaseModel):
+    nome: str = Field(max_length=120)
+    agregacao: AGREGACAO
+    coluna: str | None = Field(default=None, max_length=200)
+    dimensao: str | None = Field(default=None, max_length=200)
+    tempo: str | None = Field(default=None, max_length=200)
+    periodo: PERIODO | None = None
+
+
+class IndicadorEdicao(BaseModel):
+    nome: str | None = Field(default=None, max_length=120)
+    agregacao: AGREGACAO | None = None
+    coluna: str | None = Field(default=None, max_length=200)
+    dimensao: str | None = Field(default=None, max_length=200)
+    tempo: str | None = Field(default=None, max_length=200)
+    periodo: PERIODO | None = None
+    confirmado: bool | None = None
+
+
+class Descartado(BaseModel):
+    nome: str
+    motivo: str
+
+
+class Proposta(BaseModel):
+    segmento: str | None
+    indicadores: list[Indicador]
+    descartados: list[Descartado] = []

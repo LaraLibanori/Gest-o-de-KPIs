@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from .db import abrir_conexao
-from .routers import conexoes, organizacoes, perfil
+from .routers import conexoes, organizacoes, perfil, segmentos
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
@@ -53,6 +53,7 @@ if frontend_origin:
 app.include_router(perfil.router)
 app.include_router(organizacoes.router)
 app.include_router(conexoes.router)
+app.include_router(segmentos.router)
 
 
 @app.get("/health")
