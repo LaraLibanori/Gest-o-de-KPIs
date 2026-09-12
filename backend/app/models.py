@@ -54,7 +54,6 @@ class Organizacao(Base):
     )
 
 
-# E esta tabela que faz o compartilhamento: quem esta aqui ve a organizacao.
 class Membro(Base):
     __tablename__ = "organizacao_membros"
     __table_args__ = (
@@ -80,8 +79,7 @@ class Membro(Base):
     )
 
 
-# Convite de quem ainda nao tem conta. Ao se cadastrar, um trigger converte
-# o convite em membro e apaga a linha.
+# Ao se cadastrar, um trigger converte o convite em membro e apaga a linha.
 class Convite(Base):
     __tablename__ = "convites"
     __table_args__ = (
@@ -106,7 +104,7 @@ class Convite(Base):
     )
 
 
-# Banco PostgreSQL da empresa. A senha fica cifrada, nunca em texto puro.
+# A senha fica cifrada, nunca em texto puro.
 class Conexao(Base):
     __tablename__ = "conexoes"
     __table_args__ = (
@@ -148,7 +146,6 @@ class Conexao(Base):
     )
 
 
-# Uma coluna da tabela fato, com o papel que ela cumpre no indicador.
 class Campo(Base):
     __tablename__ = "catalogo_campos"
     __table_args__ = (
@@ -174,8 +171,7 @@ class Campo(Base):
     ordem: Mapped[int] = mapped_column(Integer)
 
 
-# Ramo de negocio. Lista fechada, semeada na migration: e ela que faz o cache
-# de indicadores acertar, porque texto livre nunca repete.
+# Lista fechada: e ela que faz o cache acertar, porque texto livre nunca repete.
 class Segmento(Base):
     __tablename__ = "segmentos"
 
@@ -184,8 +180,6 @@ class Segmento(Base):
     ordem: Mapped[int] = mapped_column(Integer)
 
 
-# Indicador que costuma valer para o segmento, sem saber nada da tabela de
-# ninguem. So vira indicador de verdade depois de casar com o catalogo.
 class SegmentoKpi(Base):
     __tablename__ = "segmento_kpis"
     __table_args__ = (
@@ -208,7 +202,7 @@ class SegmentoKpi(Base):
     ordem: Mapped[int] = mapped_column(Integer)
 
 
-# Cache da classificacao: md5 do texto normalizado aponta para o segmento.
+# Md5 do texto normalizado aponta para o segmento.
 class Classificacao(Base):
     __tablename__ = "classificacoes"
 
@@ -222,8 +216,7 @@ class Classificacao(Base):
     )
 
 
-# Indicador ja casado com as colunas da conexao. Guarda o nome da coluna e nao
-# o id do campo: o catalogo e refeito do zero a cada leitura da tabela.
+# Guarda o nome da coluna, nao o id: o catalogo e refeito a cada leitura.
 class Indicador(Base):
     __tablename__ = "indicadores"
     __table_args__ = (

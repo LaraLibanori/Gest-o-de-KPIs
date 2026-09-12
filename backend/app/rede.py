@@ -9,8 +9,7 @@ class RedeInterna(Exception):
     pass
 
 
-# Devolve o ip aprovado. Conectar nele, e nao no nome, fecha a janela entre
-# conferir e conectar, em que o dns poderia responder outra coisa.
+# Conectar no ip conferido, e nao no nome, fecha a janela para o dns mudar.
 async def conferir(host: str) -> str:
     if PERMITIR_REDE_INTERNA:
         return host

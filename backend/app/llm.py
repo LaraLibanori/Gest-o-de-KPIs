@@ -123,7 +123,6 @@ async def _listar(cliente: httpx.AsyncClient, base: str, chave: str) -> list[dic
     return resposta.json().get("data", [])
 
 
-# A lista muda sem aviso, entao e descoberta na hora e guardada.
 async def modelos() -> list[str]:
     global _modelos
     async with _tranca:

@@ -2,7 +2,6 @@ import { createClient } from "./supabase/client";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
-// O token do Supabase vai no header. É com ele que o FastAPI sabe quem é.
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const supabase = createClient();
   const {

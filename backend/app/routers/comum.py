@@ -32,7 +32,6 @@ async def abrir(conexao: ConexaoDb) -> asyncpg.Connection:
     )
 
 
-# Abre o banco da empresa, roda a tarefa e fecha, traduzindo a falha em HTTP.
 async def consultar(conexao: ConexaoDb, tarefa: Callable[[asyncpg.Connection], Any]):
     try:
         externa = await abrir(conexao)

@@ -21,7 +21,6 @@ conferir_ambiente()
 app = FastAPI(title="KPI Builder API", version="0.1.0")
 
 
-# Um identificador por requisicao, para achar o erro no log depois.
 @app.middleware("http")
 async def identificar(request: Request, chamar):
     request.state.pedido = uuid.uuid4().hex[:8]

@@ -62,8 +62,6 @@ async def criar(
     return resposta
 
 
-# Abre o banco da empresa de verdade e guarda o resultado, para o cartao da
-# conexao poder dizer se ela responde.
 @router.post("/{conexao_id}/verificar", response_model=Verificacao)
 async def verificar(
     organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao

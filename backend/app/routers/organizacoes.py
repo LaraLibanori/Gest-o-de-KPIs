@@ -32,8 +32,7 @@ async def listar(user: CurrentUser, sessao: Sessao):
 
 @router.post("", response_model=Organizacao, status_code=201)
 async def criar(body: OrganizacaoIn, user: CurrentUser, sessao: Sessao):
-    # A funcao cria a organizacao e o dono de uma vez: pela RLS, quem cria ainda
-    # nao e membro e nao conseguiria inserir a si mesmo.
+    # Pela RLS quem cria ainda nao e membro, entao nao inseriria a si mesmo.
     linha = (
         await sessao.execute(
             text("select id, nome, criada_em from public.criar_organizacao(:nome)"),
@@ -180,7 +179,6 @@ async def remover_membro(
     organizacao_id: UUID, usuario_id: UUID, user: CurrentUser, sessao: Sessao
 ):
     meu_papel = await _papel(sessao, organizacao_id, user.id)
-    # Dono tira quem quiser; membro só sai por conta própria.
     if meu_papel != "dono" and usuario_id != user.id:
         raise HTTPException(403, "só o dono pode remover outra pessoa")
 

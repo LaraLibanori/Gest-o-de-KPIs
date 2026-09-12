@@ -9,7 +9,7 @@ def normalizar(texto: str) -> str:
     return " ".join(re.sub(r"[^\w\s]|_", " ", limpo).split())
 
 
-# Chave do cache de classificacao. Md5 aqui nao guarda segredo, so identifica.
+# Md5 aqui nao guarda segredo, so identifica o texto.
 def chave(texto: str) -> str:
     return hashlib.md5(normalizar(texto).encode(), usedforsecurity=False).hexdigest()
 

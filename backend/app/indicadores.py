@@ -34,8 +34,7 @@ def _somavel(campo) -> bool:
     return not any(p in _texto(campo) for p in NAO_SOMAVEIS)
 
 
-# Quem se chama total costuma ser o valor cheio da linha, e dinheiro vem antes
-# de contagem.
+# Quem se chama total costuma ser o valor cheio, e dinheiro vem antes de contagem.
 def _peso(campo) -> tuple:
     return (
         0 if "total" in _texto(campo) else 1,
@@ -59,7 +58,6 @@ def _separar(campos):
     )
 
 
-# Sem segmento, ou com segmento que nao cobre: indicador direto do catalogo.
 def por_regra(campos, quantos: int = QUANTOS) -> list[dict]:
     metricas, dimensoes, tempos, chaves = _separar(campos)
     somaveis = sorted([m for m in metricas if _somavel(m)], key=_peso)
@@ -98,8 +96,7 @@ def por_regra(campos, quantos: int = QUANTOS) -> list[dict]:
     return indicadores
 
 
-# Liga um indicador do segmento a uma coluna do catalogo. Match fraco ou
-# empatado vira escolha do usuario, nao chute.
+# Semelhanca fraca ou empatada vira escolha do usuario, nao chute.
 def casar(kpi, campos) -> dict:
     aceitos = PAPEIS_ACEITOS[kpi.agregacao]
     if not aceitos:

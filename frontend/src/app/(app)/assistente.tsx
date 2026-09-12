@@ -106,7 +106,6 @@ export default function Assistente({
       .catch(() => {});
   }, [aberto]);
 
-  // Retoma de onde a pessoa parou, ou começa do zero.
   useEffect(() => {
     if (!aberto) return;
     setMudou(false);

@@ -27,7 +27,6 @@ async def listar_catalogo(
     return list(linhas)
 
 
-# Le as colunas da tabela fato e classifica por tipo e cardinalidade.
 @router.post("/{conexao_id}/catalogo", response_model=list[Campo], status_code=201)
 async def montar_catalogo(
     organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
@@ -53,7 +52,6 @@ async def montar_catalogo(
     return resposta
 
 
-# Sugestao de rotulo e papel. So mexe no que o usuario ainda nao confirmou.
 @router.post("/{conexao_id}/catalogo/rotulos", response_model=Sugestao)
 async def sugerir_rotulos(
     organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao

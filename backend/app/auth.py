@@ -51,7 +51,6 @@ def get_user(
     except jwt.PyJWTError:
         raise _recusar()
 
-    # O sub precisa existir e ser uuid: sem isso vira erro 500 lá na query.
     try:
         return User(id=UUID(claims["sub"]), email=claims.get("email"))
     except (KeyError, ValueError, TypeError):

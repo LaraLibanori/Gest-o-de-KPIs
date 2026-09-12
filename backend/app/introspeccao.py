@@ -1,6 +1,5 @@
 import asyncpg
 
-# Quanto valor distinto uma coluna pode ter e ainda servir de dimensao.
 LIMITE_DIMENSAO = 100
 AMOSTRA = 5000
 
@@ -16,7 +15,6 @@ PROPORCAO_DIMENSAO = 0.5
 TIPOS = {"r": "tabela", "p": "tabela", "v": "view", "m": "view materializada"}
 
 # pg_class porque o information_schema nao enxerga view materializada.
-# So entra o que o usuario da conexao pode mesmo ler.
 RELACOES = """
     select n.nspname as esquema, c.relname as nome, c.relkind::text as especie
     from pg_class c
@@ -93,7 +91,6 @@ async def _cardinalidades(
                 valores[e["attname"]] = max(1, round(-distintos * linhas))
         return valores, linhas or None
 
-    # View comum nao tem estatistica: conta sobre uma amostra.
     if not colunas:
         return {}, None
     contagens = ", ".join(f"count(distinct {citar(c)}) as {citar(c)}" for c in colunas)

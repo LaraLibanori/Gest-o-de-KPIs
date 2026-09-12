@@ -42,7 +42,6 @@ class ConviteIn(BaseModel):
     papel: Literal["dono", "membro"] = "membro"
 
 
-# Convidar quem ja tem conta vira membro na hora; quem nao tem fica pendente.
 class Convite(BaseModel):
     id: UUID | None
     email: str
