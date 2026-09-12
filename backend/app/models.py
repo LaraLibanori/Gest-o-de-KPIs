@@ -205,7 +205,6 @@ class SegmentoKpi(Base):
     nome: Mapped[str] = mapped_column(Text)
     pista: Mapped[str | None] = mapped_column(Text, nullable=True)
     agregacao: Mapped[str] = mapped_column(Text)
-    papel: Mapped[str | None] = mapped_column(Text, nullable=True)
     ordem: Mapped[int] = mapped_column(Integer)
 
 

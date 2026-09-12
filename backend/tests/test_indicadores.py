@@ -17,7 +17,6 @@ class Kpi:
     nome: str
     pista: str | None
     agregacao: str
-    papel: str | None
 
 
 VENDAS = [
@@ -42,12 +41,12 @@ def test_regra_nao_soma_preco_unitario():
 
 
 def test_contar_distintos_aceita_identificador():
-    kpi = Kpi("Clientes atendidos", "cliente", "distintos", "dimensao")
+    kpi = Kpi("Clientes atendidos", "cliente", "distintos")
     assert casar(kpi, VENDAS)["coluna"] == "cliente_id"
 
 
 def test_match_ambiguo_vira_escolha():
-    kpi = Kpi("Receita", "valor", "soma", "metrica")
+    kpi = Kpi("Receita", "valor", "soma")
     resultado = casar(kpi, VENDAS)
     assert resultado["situacao"] == "escolher"
     assert resultado["coluna"] is None
@@ -55,5 +54,5 @@ def test_match_ambiguo_vira_escolha():
 
 def test_coluna_que_nao_existe_e_impossivel():
     sem_metrica = [c for c in VENDAS if c.papel != "metrica"]
-    kpi = Kpi("Receita", "valor total da venda", "soma", "metrica")
+    kpi = Kpi("Receita", "valor total da venda", "soma")
     assert casar(kpi, sem_metrica)["situacao"] == "impossivel"
