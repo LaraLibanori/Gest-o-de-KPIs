@@ -17,5 +17,17 @@ ISSUER = f"{SUPABASE_URL}/auth/v1"
 AUDIENCE = "authenticated"
 
 
+OBRIGATORIAS = ("SUPABASE_URL", "DATABASE_URL", "APP_SECRET_KEY")
+
+
+# Falta de variavel derruba o processo no boot, e nao na primeira requisicao.
+def conferir_ambiente() -> None:
+    faltando = [nome for nome in OBRIGATORIAS if not os.environ.get(nome)]
+    if faltando:
+        raise RuntimeError(f"faltam variáveis de ambiente: {', '.join(faltando)}")
+    if PERMITIR_REDE_INTERNA and os.environ.get("VERCEL_ENV") == "production":
+        raise RuntimeError("PERMITIR_REDE_INTERNA não pode ficar ligado em produção")
+
+
 def url_asyncpg(url: str) -> str:
     return url.replace("postgresql://", "postgresql+asyncpg://", 1)

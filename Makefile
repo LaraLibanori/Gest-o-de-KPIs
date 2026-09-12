@@ -127,8 +127,9 @@ checar-front:
 	cd frontend && npm run build
 	cd frontend && npx tsc --noEmit
 
+# So confere que importa, entao os valores de ambiente nao precisam ser reais.
 checar-back:
-	cd backend && "$(PY)" -c "import app.main"
+	cd backend && SUPABASE_URL=x DATABASE_URL=x APP_SECRET_KEY=x "$(PY)" -c "import app.main"
 
 # Cadastra em producao e em preview, sobrescrevendo o que ja existir.
 env: env-front env-back
