@@ -12,6 +12,7 @@ import {
   type IndicadorNovo,
   type Periodo,
 } from "@/lib/api";
+import Confirmar from "@/components/confirmar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -50,7 +51,9 @@ function Campos({
     >
       <SelectTrigger
         size="sm"
-        className={"w-auto min-w-36" + (valor ? "" : " border-amber-500")}
+        className={
+          "w-auto min-w-36" + (valor || opcional ? "" : " border-amber-500")
+        }
       >
         <SelectValue placeholder={vazio} />
       </SelectTrigger>
@@ -203,6 +206,7 @@ export default function PassoIndicadores({
   onConcluir: () => void;
 }) {
   const [criando, setCriando] = useState(false);
+  const [aRemover, setARemover] = useState<Indicador | null>(null);
   const rotulo = (coluna: string | null) =>
     campos.find((c) => c.coluna === coluna)?.rotulo ?? coluna ?? "";
   const faltando = indicadores.filter(
@@ -214,9 +218,11 @@ export default function PassoIndicadores({
       <div className="text-muted-foreground my-2 text-sm">
         {ocupado
           ? "Montando os indicadores…"
-          : faltando > 0
-            ? `${indicadores.length} indicadores · ${faltando} esperando você escolher o campo`
-            : `${indicadores.length} indicadores, todos com campo definido`}
+          : indicadores.length === 0
+            ? "Nada por aqui ainda."
+            : faltando > 0
+              ? `${indicadores.length} ${indicadores.length === 1 ? "indicador" : "indicadores"} · ${faltando} esperando você escolher o campo`
+              : `${indicadores.length} ${indicadores.length === 1 ? "indicador definido" : "indicadores, todos com campo definido"}`}
       </div>
 
       <div className="max-h-96 space-y-2 overflow-y-auto">
@@ -247,7 +253,7 @@ export default function PassoIndicadores({
                     size="icon"
                     variant="ghost"
                     className="size-7"
-                    onClick={() => onRemover(i)}
+                    onClick={() => setARemover(i)}
                   >
                     <X className="size-3.5" />
                   </Button>
@@ -314,6 +320,18 @@ export default function PassoIndicadores({
           Concluir
         </Button>
       </DialogFooter>
+
+      <Confirmar
+        aberto={aRemover !== null}
+        titulo={`Remover ${aRemover?.nome}?`}
+        descricao="O indicador sai desta conexão. Dá para montar de novo depois, pelo botão de adicionar ou refazendo a proposta."
+        acao="Remover"
+        onConfirmar={() => {
+          if (aRemover) onRemover(aRemover);
+          setARemover(null);
+        }}
+        onFechar={() => setARemover(null)}
+      />
     </>
   );
 }
