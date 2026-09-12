@@ -247,6 +247,7 @@ export default function Assistente({
       });
     } catch (e) {
       falhar(e);
+      setCampos((lista) => lista.map((c) => (c.id === campo.id ? campo : c)));
     }
   }
 
@@ -288,6 +289,7 @@ export default function Assistente({
 
   async function removerIndicador(indicador: Indicador) {
     if (!atual) return;
+    const antes = indicadores;
     setIndicadores((lista) => lista.filter((i) => i.id !== indicador.id));
     try {
       await api<void>(`${base}/${atual.id}/indicadores/${indicador.id}`, {
@@ -295,6 +297,7 @@ export default function Assistente({
       });
     } catch (e) {
       falhar(e);
+      setIndicadores(antes);
     }
   }
 

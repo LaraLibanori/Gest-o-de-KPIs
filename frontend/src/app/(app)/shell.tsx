@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -77,7 +77,9 @@ export default function Shell({
       const lista = await api<Organizacao[]>("/organizacoes");
       setOrganizacoes(lista);
       setAbertaId((atual) =>
-        atual && lista.some((o) => o.id === atual) ? atual : (lista[0]?.id ?? null),
+        atual && lista.some((o) => o.id === atual)
+          ? atual
+          : (lista[0]?.id ?? null),
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "não foi possível carregar");
@@ -112,7 +114,9 @@ export default function Shell({
       setDialogo(false);
       toast.success(`${nova.nome} criada`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "não foi possível criar");
+      toast.error(
+        err instanceof Error ? err.message : "não foi possível criar",
+      );
     } finally {
       setCriando(false);
     }
@@ -120,9 +124,13 @@ export default function Shell({
 
   const aberta = organizacoes.find((o) => o.id === abertaId) ?? null;
   const pagina = NAVEGACAO.find((n) => n.href === caminho);
+  const contexto = useMemo(
+    () => ({ email, organizacoes, aberta, carregando, recarregar }),
+    [email, organizacoes, aberta, carregando, recarregar],
+  );
 
   return (
-    <OrganizacaoProvider value={{ email, organizacoes, aberta, carregando, recarregar }}>
+    <OrganizacaoProvider value={contexto}>
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarHeader>
@@ -136,7 +144,8 @@ export default function Shell({
                       </div>
                       <div className="grid flex-1 text-left leading-tight">
                         <span className="truncate font-medium">
-                          {aberta?.nome ?? (carregando ? "Carregando…" : "KPI Builder")}
+                          {aberta?.nome ??
+                            (carregando ? "Carregando…" : "KPI Builder")}
                         </span>
                         <span className="text-muted-foreground truncate text-xs">
                           {aberta?.papel ??
@@ -154,10 +163,15 @@ export default function Shell({
                       Organizações
                     </DropdownMenuLabel>
                     {organizacoes.map((o) => (
-                      <DropdownMenuItem key={o.id} onSelect={() => setAbertaId(o.id)}>
+                      <DropdownMenuItem
+                        key={o.id}
+                        onSelect={() => setAbertaId(o.id)}
+                      >
                         <Building2 />
                         <span className="truncate">{o.nome}</span>
-                        {o.id === abertaId && <Check className="ml-auto size-4" />}
+                        {o.id === abertaId && (
+                          <Check className="ml-auto size-4" />
+                        )}
                       </DropdownMenuItem>
                     ))}
                     {organizacoes.length > 0 && <DropdownMenuSeparator />}
@@ -205,18 +219,31 @@ export default function Shell({
                           {email.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="flex-1 truncate text-left text-sm">{email}</span>
+                      <span className="flex-1 truncate text-left text-sm">
+                        {email}
+                      </span>
                       <ChevronsUpDown className="ml-auto size-4" />
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent side="top" align="start" className="w-56">
+                  <DropdownMenuContent
+                    side="top"
+                    align="start"
+                    className="w-56"
+                  >
                     <DropdownMenuLabel className="text-muted-foreground truncate text-xs font-normal">
                       {email}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild variant="destructive">
-                      <form action="/auth/signout" method="post" className="w-full">
-                        <button type="submit" className="flex w-full items-center gap-2">
+                      <form
+                        action="/auth/signout"
+                        method="post"
+                        className="w-full"
+                      >
+                        <button
+                          type="submit"
+                          className="flex w-full items-center gap-2"
+                        >
                           <LogOut className="size-4" />
                           Sair
                         </button>
