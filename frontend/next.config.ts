@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
+// No local o backend fica em outra porta; em produção /api é a mesma origem.
+const api = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 // Sem middleware não dá para usar nonce, então o script inline do Next precisa
 // de unsafe-inline. Mesmo assim script-src 'self' barra script de fora.
 const politica = [
@@ -10,7 +13,7 @@ const politica = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${supabase}`.trim(),
+  `connect-src ${["'self'", supabase, api].filter(Boolean).join(" ")}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

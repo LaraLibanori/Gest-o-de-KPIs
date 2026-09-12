@@ -11,15 +11,21 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!session) throw new Error("sessão expirada, faça login de novo");
 
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    signal: AbortSignal.timeout(15000),
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session.access_token}`,
-      ...init?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        ...init?.headers,
+      },
+    });
+  } catch {
+    // Estouro de tempo ou rede fora: a mensagem crua do navegador não ajuda.
+    throw new Error("o servidor não respondeu, tente de novo");
+  }
 
   if (!res.ok) throw new Error(await mensagem(res));
 
