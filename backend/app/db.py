@@ -9,9 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from .auth import CurrentUser
-from .config import DATABASE_URL, url_asyncpg
+from .config import DATABASE_URL, USAR_POOL, url_asyncpg
 
 _fabrica: async_sessionmaker[AsyncSession] | None = None
+
+
+# Guardar conexao so vale em processo longo, com um event loop so.
+def _pool() -> dict:
+    if USAR_POOL:
+        return {"pool_size": 5, "max_overflow": 0, "pool_recycle": 280}
+    return {"poolclass": NullPool}
 
 
 def _sessoes() -> async_sessionmaker[AsyncSession]:
@@ -20,7 +27,7 @@ def _sessoes() -> async_sessionmaker[AsyncSession]:
         # Nome unico por statement, senao dois clientes colidem no pooler.
         motor = create_async_engine(
             url_asyncpg(DATABASE_URL),
-            poolclass=NullPool,
+            **_pool(),
             connect_args={
                 "statement_cache_size": 0,
                 "command_timeout": 10,
@@ -34,9 +41,7 @@ def _sessoes() -> async_sessionmaker[AsyncSession]:
 
 async def abrir_sessao(user: CurrentUser) -> AsyncIterator[AsyncSession]:
     async with _sessoes()() as sessao:
-        # E daqui que o auth.uid() das policies le o usuario. O terceiro
-        # argumento true deixa o valor preso a transacao: sem isso ele sobraria
-        # na conexao e vazaria para o proximo cliente do pooler.
+        # O true prende o valor a transacao: senao vaza para o proximo cliente.
         await sessao.execute(
             text("select set_config('request.jwt.claims', :claims, true)"),
             {"claims": json.dumps({"sub": str(user.id), "role": "authenticated"})},
@@ -47,6 +52,5 @@ async def abrir_sessao(user: CurrentUser) -> AsyncIterator[AsyncSession]:
 Sessao = Annotated[AsyncSession, Depends(abrir_sessao)]
 
 
-# Usado pelo /ready: erro de conexao aqui vira 503, e nao 500 na dependencia.
 def abrir_conexao():
     return _sessoes()()

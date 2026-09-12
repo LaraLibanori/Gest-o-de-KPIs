@@ -79,9 +79,10 @@ dev: portas
 dev-front:
 	cd frontend && NEXT_PUBLIC_API_URL=$(URL_BACK) npm run dev -- --port $(PORTA_FRONT)
 
+# KPI_POOL reaproveita a conexao: so aqui, onde o processo e longo.
 dev-back:
 	$(call CARREGAR,$(ENV_BACK)); \
-	export FRONTEND_ORIGIN=$(URL_FRONT); \
+	export FRONTEND_ORIGIN=$(URL_FRONT) KPI_POOL=1; \
 	cd backend && "$(PY)" -m uvicorn app.main:app --reload --port $(PORTA_BACK)
 
 portas:
