@@ -17,8 +17,8 @@ senha    admin123
 Também dá para criar a sua na própria tela de login: a conta já entra ativa,
 sem confirmar e-mail.
 
-Por enquanto estão prontos o login, as organizações e o cadastro das conexões.
-A leitura da tabela fato e os indicadores vêm depois.
+Por enquanto estão prontos o login, as organizações, o cadastro das conexões e
+a definição dos indicadores. Os painéis vêm depois.
 
 ## Como funciona
 
@@ -50,6 +50,10 @@ organizacao_membros    quem participa de qual organização
 convites               quem foi convidado e ainda não tem conta
 conexoes               bancos da empresa, com a senha cifrada
 catalogo_campos        colunas da tabela fato e o papel de cada uma
+segmentos              ramos de negócio, lista fechada
+segmento_kpis          indicadores que costumam valer para cada ramo
+classificacoes         cache da descrição de negócio para o ramo
+indicadores            indicadores da conexão, já ligados às colunas
 ```
 
 O schema `exemplo` tem uma base fictícia que faz o papel de banco do cliente,
@@ -160,6 +164,12 @@ distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 | GET    | `/api/organizacoes/{id}/conexoes/{cid}/catalogo`  |
 | POST   | `/api/organizacoes/{id}/conexoes/{cid}/catalogo`  |
 | PATCH  | `/api/.../catalogo/{campo}`                       |
+| GET    | `/api/organizacoes/{id}/conexoes/{cid}/indicadores` |
+| POST   | `/api/organizacoes/{id}/conexoes/{cid}/indicadores` |
+| POST   | `/api/.../indicadores/propor`                     |
+| PATCH  | `/api/.../indicadores/{iid}`                      |
+| DELETE | `/api/.../indicadores/{iid}`                      |
+| GET    | `/api/segmentos`                                  |
 | DELETE | `/api/organizacoes/{id}/conexoes/{cid}`           |
 
 Menos `/health` e `/ready`, todas pedem `Authorization: Bearer <token>`.
@@ -172,5 +182,6 @@ entra na organização quando se cadastrar.
 - [x] Ler os metadados da tabela fato e sugerir métricas e dimensões
 - [x] Assistente em etapas para cadastrar a conexão
 - [x] Sugestão de rótulo e papel por LLM
-- [ ] Definição de KPIs e de campos calculados
+- [x] Indicadores por ramo de negócio, com confirmação dos campos
+- [ ] Campos calculados
 - [ ] Dashboards com os indicadores da organização
