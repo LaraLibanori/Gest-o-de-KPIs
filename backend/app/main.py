@@ -7,13 +7,16 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from .config import conferir_ambiente
 from .db import abrir_conexao
-from .routers import conexoes, organizacoes, perfil, segmentos
+from .routers import catalogo, conexoes, indicadores, organizacoes, perfil, segmentos
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
 )
 registro = logging.getLogger("kpi")
+
+conferir_ambiente()
 
 app = FastAPI(title="KPI Builder API", version="0.1.0")
 
@@ -53,6 +56,8 @@ if frontend_origin:
 app.include_router(perfil.router)
 app.include_router(organizacoes.router)
 app.include_router(conexoes.router)
+app.include_router(catalogo.router)
+app.include_router(indicadores.router)
 app.include_router(segmentos.router)
 
 
@@ -70,8 +75,8 @@ def health() -> dict:
 async def ready(response: Response) -> dict:
     try:
         async with abrir_conexao() as conexao:
-            role = await conexao.scalar(text("select current_user"))
+            await conexao.scalar(text("select 1"))
     except Exception:  # noqa: BLE001 - qualquer falha aqui vira 503, nunca 500
         response.status_code = 503
         return {"status": "sem banco"}
-    return {"status": "ok", "role": role}
+    return {"status": "ok"}

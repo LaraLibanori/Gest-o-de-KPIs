@@ -9,11 +9,11 @@ class RedeInterna(Exception):
     pass
 
 
-# O banco do cliente e um host que ele digita. Sem isso, dava para apontar a
-# conexao para um endereco interno e usar a API como sonda.
-async def conferir(host: str) -> None:
+# Devolve o ip aprovado. Conectar nele, e nao no nome, fecha a janela entre
+# conferir e conectar, em que o dns poderia responder outra coisa.
+async def conferir(host: str) -> str:
     if PERMITIR_REDE_INTERNA:
-        return
+        return host
     try:
         enderecos = await asyncio.get_running_loop().getaddrinfo(
             host, None, type=socket.SOCK_STREAM
@@ -31,3 +31,7 @@ async def conferir(host: str) -> None:
             or ip.is_multicast
         ):
             raise RedeInterna("endereço de rede interna não é aceito")
+
+    # IPv4 na frente: as funções da Vercel não saem por IPv6.
+    quatro = [i for i in enderecos if i[0] == socket.AF_INET]
+    return (quatro or enderecos)[0][4][0]
