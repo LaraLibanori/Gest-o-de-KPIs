@@ -134,6 +134,7 @@ export type Indicador = {
   dimensao: string | null;
   tempo: string | null;
   periodo: Periodo | null;
+  grafico: Grafico;
   origem: "regra" | "segmento" | "manual";
   confirmado: boolean;
   ordem: number;
@@ -190,6 +191,36 @@ export type IndicadorNovo = {
   tempo: string | null;
   periodo: Periodo | null;
 };
+
+export type SugestaoGrafico = { aplicadas: number; indicadores: Indicador[] };
+
+export type Grafico = "numero" | "barra" | "linha" | "pizza" | "tabela";
+
+export const GRAFICOS: Record<Grafico, string> = {
+  numero: "Número",
+  barra: "Barra",
+  linha: "Linha",
+  pizza: "Pizza",
+  tabela: "Tabela",
+};
+
+// Mesma lista do backend: o que cada forma exige do indicador.
+export const EXIGENCIAS: Record<Grafico, ("dimensao" | "tempo")[]> = {
+  numero: [],
+  barra: ["dimensao"],
+  pizza: ["dimensao"],
+  tabela: ["dimensao"],
+  linha: ["tempo"],
+};
+
+export function formasPossiveis(i: {
+  dimensao: string | null;
+  tempo: string | null;
+}): Grafico[] {
+  return (Object.keys(EXIGENCIAS) as Grafico[]).filter((f) =>
+    EXIGENCIAS[f].every((campo) => i[campo]),
+  );
+}
 
 export type Quebra = { rotulo: string; valor: number | null };
 

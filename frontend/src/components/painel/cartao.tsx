@@ -9,6 +9,9 @@ import {
 } from "@/lib/api";
 import { cheio, curto } from "@/lib/numero";
 import Barras from "@/components/painel/barras";
+import Linha from "@/components/painel/linha";
+import Pizza from "@/components/painel/pizza";
+import Tabela from "@/components/painel/tabela";
 import {
   Card,
   CardContent,
@@ -55,7 +58,16 @@ export default function Cartao({
             {indicador.valor === null ? "—" : curto(indicador.valor)}
           </p>
         )}
-        {indicador.linhas.length > 0 && <Barras linhas={indicador.linhas} />}
+        {indicador.linhas.length > 0 &&
+          (indicador.grafico === "linha" ? (
+            <Linha linhas={indicador.linhas} />
+          ) : indicador.grafico === "pizza" ? (
+            <Pizza linhas={indicador.linhas} />
+          ) : indicador.grafico === "tabela" ? (
+            <Tabela linhas={indicador.linhas} />
+          ) : (
+            <Barras linhas={indicador.linhas} />
+          ))}
       </CardContent>
     </Card>
   );
