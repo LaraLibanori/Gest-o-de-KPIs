@@ -197,3 +197,20 @@ class Proposta(BaseModel):
     segmento: str | None
     indicadores: list[Indicador]
     descartados: list[Descartado] = []
+
+
+class Quebra(BaseModel):
+    rotulo: str
+    valor: float | None
+
+
+class IndicadorCalculado(Indicador):
+    valor: float | None = None
+    linhas: list[Quebra] = []
+    erro: str | None = None
+
+
+class Painel(BaseModel):
+    tabela: str | None
+    indicadores: list[IndicadorCalculado] = []
+    erro: str | None = None

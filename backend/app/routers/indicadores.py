@@ -4,14 +4,23 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import delete, func, select
 
 from ..auth import CurrentUser
+from ..calculo import calcular
 from ..db import Sessao
 from ..indicadores import PAPEIS_ACEITOS, QUANTOS, casar, por_regra
 from ..models import Campo as CampoDb
 from ..models import Indicador as IndicadorDb
 from ..models import SegmentoKpi as KpiDb
 from ..permissoes import exigir_dono, papel
-from ..schemas import Indicador, IndicadorEdicao, IndicadorIn, Proposta
-from .comum import PREFIXO, buscar, campos
+from ..schemas import (
+    Indicador,
+    IndicadorCalculado,
+    IndicadorEdicao,
+    IndicadorIn,
+    Painel,
+    Proposta,
+    Quebra,
+)
+from .comum import PREFIXO, buscar, campos, consultar
 
 router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
 
@@ -221,3 +230,37 @@ async def remover_indicador(
     if resultado.rowcount == 0:
         raise HTTPException(404, "indicador não encontrado")
     await sessao.commit()
+
+
+# Abre o banco do cliente uma vez e calcula todos os indicadores nele.
+@router.get("/{conexao_id}/painel", response_model=Painel)
+async def painel(
+    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+):
+    await papel(sessao, organizacao_id, user.id)
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    linhas = list(
+        await sessao.scalars(
+            select(IndicadorDb)
+            .where(IndicadorDb.conexao_id == conexao_id)
+            .order_by(IndicadorDb.ordem)
+        )
+    )
+    saida = [IndicadorCalculado.model_validate(i) for i in linhas]
+    if not linhas or not conexao.tabela_fato:
+        return Painel(tabela=conexao.tabela_fato, indicadores=saida)
+
+    tabela = conexao.tabela_fato
+    try:
+        valores = await consultar(
+            conexao, lambda externa: calcular(externa, tabela, linhas)
+        )
+    except HTTPException as e:
+        return Painel(tabela=tabela, indicadores=saida, erro=e.detail)
+
+    for calculado in saida:
+        dados = valores.get(str(calculado.id), {})
+        calculado.valor = dados.get("valor")
+        calculado.linhas = [Quebra(**q) for q in dados.get("linhas", [])]
+        calculado.erro = dados.get("erro")
+    return Painel(tabela=tabela, indicadores=saida)
