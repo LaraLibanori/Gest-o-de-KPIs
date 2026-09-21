@@ -30,6 +30,7 @@ export default function PainelDaConexao() {
   const [painel, setPainel] = useState<Painel | null>(null);
   const [campos, setCampos] = useState<Campo[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   const base = aberta ? `/organizacoes/${aberta.id}/conexoes` : null;
 
@@ -45,7 +46,10 @@ export default function PainelDaConexao() {
       setConexao(lista.find((c) => c.id === id) ?? null);
       setCampos(catalogo);
       setPainel(dados);
+      setErro(null);
     } catch (e) {
+      // Sem isso a falha viraria o estado vazio, que diz outra coisa.
+      setErro(e instanceof Error ? e.message : "não foi possível carregar");
       falhar(e, "não foi possível carregar o painel");
     } finally {
       setCarregando(false);
@@ -92,10 +96,10 @@ export default function PainelDaConexao() {
         </Button>
       </div>
 
-      {painel?.erro && (
+      {(erro ?? painel?.erro) && (
         <p className="text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-4 text-sm">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-          {painel.erro}
+          {erro ?? painel?.erro}
         </p>
       )}
 
@@ -105,7 +109,7 @@ export default function PainelDaConexao() {
             <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
-      ) : painel && painel.indicadores.length > 0 ? (
+      ) : erro ? null : painel && painel.indicadores.length > 0 ? (
         <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {painel.indicadores.map((i) => (
             <Cartao key={i.id} indicador={i} rotulo={rotulo} />

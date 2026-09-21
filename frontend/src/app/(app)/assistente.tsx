@@ -279,7 +279,14 @@ export default function Assistente({
             method: "POST",
           },
         );
-        if (r.aplicadas > 0) setIndicadores(r.indicadores);
+        if (r.aplicadas === 0) return;
+        // So a forma volta da sugestao: o resto pode ter mudado nesse meio tempo.
+        const formas = new Map(r.indicadores.map((i) => [i.id, i.grafico]));
+        setIndicadores((lista) =>
+          lista.map((i) =>
+            formas.has(i.id) ? { ...i, grafico: formas.get(i.id)! } : i,
+          ),
+        );
       } catch {
         // sem sugestao a forma por regra continua valendo
       }
