@@ -217,8 +217,10 @@ async def ajustar_indicador(
     mudancas = body.model_dump(exclude_unset=True)
     for nome, valor in mudancas.items():
         setattr(indicador, nome, valor)
-    # Escolheu a quebra e nao mexeu na forma: numero vira barra sozinho.
-    if "dimensao" in mudancas and "grafico" not in mudancas:
+    # So mexe na forma se a escolhida deixou de caber; nao apaga o que a pessoa pediu.
+    if "grafico" not in mudancas and indicador.grafico not in formas_possiveis(
+        indicador
+    ):
         indicador.grafico = sugerir_grafico(indicador.dimensao)
     _conferir(indicador, await campos(sessao, conexao_id), indicador.agregacao)
 
@@ -277,6 +279,14 @@ async def sugerir_formas(
         ]
     )
 
+    # A llm demora; relê para não escrever por cima de quem editou nesse meio tempo.
+    linhas = list(
+        await sessao.scalars(
+            select(IndicadorDb)
+            .where(IndicadorDb.conexao_id == conexao_id)
+            .order_by(IndicadorDb.ordem)
+        )
+    )
     aplicadas = 0
     for indicador in linhas:
         forma = escolhas.get(indicador.nome)
