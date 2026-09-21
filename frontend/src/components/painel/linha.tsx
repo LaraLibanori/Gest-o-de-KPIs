@@ -9,15 +9,28 @@ const A = 80;
 const FOLGA = 2;
 
 export default function Linha({ linhas }: { linhas: Quebra[] }) {
-  const pontos = linhas.map((l) => l.valor ?? 0);
-  if (pontos.length < 2) return null;
+  const cheios = linhas.filter((l) => l.valor !== null);
+  if (cheios.length < 2) return null;
 
-  const maior = Math.max(...pontos);
-  const menor = Math.min(...pontos, 0);
-  const faixa = maior - menor || 1;
-  const x = (i: number) => FOLGA + (i / (pontos.length - 1)) * (L - FOLGA * 2);
+  // Sem base zero: numero longe de zero deixaria a tendencia achatada.
+  const valores = cheios.map((l) => l.valor as number);
+  const maior = Math.max(...valores);
+  const menor = Math.min(...valores);
+  const faixa = maior - menor || Math.abs(maior) || 1;
+  const x = (i: number) => FOLGA + (i / (linhas.length - 1)) * (L - FOLGA * 2);
   const y = (v: number) => FOLGA + (1 - (v - menor) / faixa) * (A - FOLGA * 2);
-  const traco = pontos.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  // Vazio virou buraco, nao zero: o traco quebra e recomeca.
+  const trechos: string[][] = [];
+  let corrente: string[] = [];
+  linhas.forEach((l, i) => {
+    if (l.valor === null) {
+      if (corrente.length) trechos.push(corrente);
+      corrente = [];
+      return;
+    }
+    corrente.push(`${x(i)},${y(l.valor)}`);
+  });
+  if (corrente.length) trechos.push(corrente);
 
   return (
     <div className="space-y-1">
@@ -28,23 +41,22 @@ export default function Linha({ linhas }: { linhas: Quebra[] }) {
         role="img"
         aria-label={`Série de ${linhas.length} pontos`}
       >
-        <polygon
-          points={`${FOLGA},${A} ${traco} ${L - FOLGA},${A}`}
-          className="fill-chart-1 opacity-10"
-        />
-        <polyline
-          points={traco}
-          className="stroke-chart-1"
-          fill="none"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-          strokeLinejoin="round"
-        />
-        {linhas.map((l, i) => (
+        {trechos.map((trecho) => (
+          <polyline
+            key={trecho[0]}
+            points={trecho.join(" ")}
+            className="stroke-chart-1"
+            fill="none"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+            strokeLinejoin="round"
+          />
+        ))}
+        {cheios.map((l) => (
           <circle
             key={l.rotulo}
-            cx={x(i)}
-            cy={y(pontos[i])}
+            cx={x(linhas.indexOf(l))}
+            cy={y(l.valor as number)}
             r={6}
             fill="transparent"
           >

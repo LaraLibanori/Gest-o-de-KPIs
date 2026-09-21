@@ -22,7 +22,10 @@ function agrupar(linhas: Quebra[]): Quebra[] {
   const resto = ordenado
     .slice(FATIAS - 1)
     .reduce((soma, l) => soma + (l.valor ?? 0), 0);
-  return [...ordenado.slice(0, FATIAS - 1), { rotulo: "Outros", valor: resto }];
+  const nomes = new Set(ordenado.map((l) => l.rotulo));
+  let sobra = "Outros";
+  while (nomes.has(sobra)) sobra += " ";
+  return [...ordenado.slice(0, FATIAS - 1), { rotulo: sobra, valor: resto }];
 }
 
 export default function Pizza({ linhas }: { linhas: Quebra[] }) {
