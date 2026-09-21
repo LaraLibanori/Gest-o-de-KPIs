@@ -20,15 +20,15 @@ export default function Linha({ linhas }: { linhas: Quebra[] }) {
   const x = (i: number) => FOLGA + (i / (linhas.length - 1)) * (L - FOLGA * 2);
   const y = (v: number) => FOLGA + (1 - (v - menor) / faixa) * (A - FOLGA * 2);
   // Vazio virou buraco, nao zero: o traco quebra e recomeca.
-  const trechos: string[][] = [];
-  let corrente: string[] = [];
+  const trechos: [number, number][][] = [];
+  let corrente: [number, number][] = [];
   linhas.forEach((l, i) => {
     if (l.valor === null) {
       if (corrente.length) trechos.push(corrente);
       corrente = [];
       return;
     }
-    corrente.push(`${x(i)},${y(l.valor)}`);
+    corrente.push([x(i), y(l.valor)]);
   });
   if (corrente.length) trechos.push(corrente);
 
@@ -41,17 +41,28 @@ export default function Linha({ linhas }: { linhas: Quebra[] }) {
         role="img"
         aria-label={`Série de ${linhas.length} pontos`}
       >
-        {trechos.map((trecho) => (
-          <polyline
-            key={trecho[0]}
-            points={trecho.join(" ")}
-            className="stroke-chart-1"
-            fill="none"
-            strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
-            strokeLinejoin="round"
-          />
-        ))}
+        {trechos.map(([primeiro, ...resto]) =>
+          // Ponto sozinho entre dois vazios: polyline de um ponto nao desenha nada.
+          resto.length ? (
+            <polyline
+              key={String(primeiro)}
+              points={[primeiro, ...resto].map((p) => p.join(",")).join(" ")}
+              className="stroke-chart-1"
+              fill="none"
+              strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
+              strokeLinejoin="round"
+            />
+          ) : (
+            <circle
+              key={String(primeiro)}
+              cx={primeiro[0]}
+              cy={primeiro[1]}
+              r={2}
+              className="fill-chart-1"
+            />
+          ),
+        )}
         {cheios.map((l) => (
           <circle
             key={l.rotulo}
