@@ -229,6 +229,10 @@ class Indicador(Base):
             name="indicadores_origem_check",
         ),
         sa.CheckConstraint(
+            "grafico in ('numero', 'barra', 'linha', 'pizza', 'tabela')",
+            name="indicadores_grafico_check",
+        ),
+        sa.CheckConstraint(
             "periodo is null or periodo in"
             " ('sempre', 'ultimos_7_dias', 'ultimos_30_dias', 'ultimos_90_dias', 'ano_atual')",
             name="indicadores_periodo_check",
@@ -248,6 +252,7 @@ class Indicador(Base):
     dimensao: Mapped[str | None] = mapped_column(Text, nullable=True)
     tempo: Mapped[str | None] = mapped_column(Text, nullable=True)
     periodo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    grafico: Mapped[str] = mapped_column(Text, server_default="numero")
     origem: Mapped[str] = mapped_column(Text)
     confirmado: Mapped[bool] = mapped_column(Boolean, server_default=sa.false())
     ordem: Mapped[int] = mapped_column(Integer)

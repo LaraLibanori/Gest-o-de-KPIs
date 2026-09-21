@@ -2,6 +2,15 @@ from .texto import normalizar, palavras
 
 QUANTOS = 5
 
+# Cada forma so aparece quando o indicador tem o que ela precisa.
+EXIGENCIAS = {
+    "numero": (),
+    "barra": ("dimensao",),
+    "pizza": ("dimensao",),
+    "tabela": ("dimensao",),
+    "linha": ("tempo",),
+}
+
 PAPEIS_ACEITOS = {
     "soma": ("metrica",),
     "media": ("metrica",),
@@ -15,6 +24,19 @@ PAPEIS_ACEITOS = {
 NAO_SOMAVEIS = ("unitario", "unitaria", "medio", "media", "taxa", "percentual")
 
 INTEIROS = ("int", "bigint", "smallint")
+
+
+# Quebra por categoria pede barra; o resto e numero ate o usuario trocar.
+def sugerir_grafico(dimensao: str | None) -> str:
+    return "barra" if dimensao else "numero"
+
+
+def formas_possiveis(indicador) -> list[str]:
+    return [
+        forma
+        for forma, exigidos in EXIGENCIAS.items()
+        if all(getattr(indicador, campo, None) for campo in exigidos)
+    ]
 
 
 def _rotulo(campo) -> str:
@@ -89,6 +111,7 @@ def por_regra(campos, quantos: int = QUANTOS) -> list[dict]:
                 "dimensao": None,
                 "tempo": tempo,
                 "periodo": "sempre",
+                "grafico": "numero",
                 "origem": "regra",
                 "ordem": len(indicadores) + 1,
             }

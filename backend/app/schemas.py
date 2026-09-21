@@ -142,6 +142,7 @@ class CampoIn(BaseModel):
 
 
 AGREGACAO = Literal["soma", "media", "contagem", "distintos", "minimo", "maximo"]
+GRAFICO = Literal["numero", "barra", "linha", "pizza", "tabela"]
 PERIODO = Literal[
     "sempre", "ultimos_7_dias", "ultimos_30_dias", "ultimos_90_dias", "ano_atual"
 ]
@@ -164,6 +165,7 @@ class Indicador(BaseModel):
     dimensao: str | None
     tempo: str | None
     periodo: PERIODO | None
+    grafico: GRAFICO
     origem: Literal["regra", "segmento", "manual"]
     confirmado: bool
     ordem: int
@@ -176,6 +178,7 @@ class IndicadorIn(BaseModel):
     dimensao: str | None = Field(default=None, max_length=200)
     tempo: str | None = Field(default=None, max_length=200)
     periodo: PERIODO | None = None
+    grafico: GRAFICO | None = None
 
 
 class IndicadorEdicao(BaseModel):
@@ -185,6 +188,7 @@ class IndicadorEdicao(BaseModel):
     dimensao: str | None = Field(default=None, max_length=200)
     tempo: str | None = Field(default=None, max_length=200)
     periodo: PERIODO | None = None
+    grafico: GRAFICO | None = None
     confirmado: bool | None = None
 
 
@@ -214,3 +218,8 @@ class Painel(BaseModel):
     tabela: str | None
     indicadores: list[IndicadorCalculado] = []
     erro: str | None = None
+
+
+class SugestaoGrafico(BaseModel):
+    aplicadas: int
+    indicadores: list[Indicador]

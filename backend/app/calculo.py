@@ -22,6 +22,15 @@ RECORTES = {
     "ano_atual": "date_trunc('year', current_date)",
 }
 
+# O balde acompanha a janela: semana curta vira dia, ano vira mes.
+BALDES = {
+    "ultimos_7_dias": "day",
+    "ultimos_30_dias": "day",
+    "ultimos_90_dias": "week",
+}
+BALDE_LARGO = "month"
+LIMITE_SERIE = 200
+
 SEM_CAMPO = "escolha o campo do indicador"
 SEM_COLUNA = "a coluna não existe mais na tabela"
 
@@ -48,20 +57,33 @@ async def _um(conexao: asyncpg.Connection, tabela: str, indicador) -> dict:
     onde = _recorte(indicador)
     valor = await conexao.fetchval(f"select {_conta(indicador)} from {de}{onde}")
 
-    linhas = []
-    if indicador.dimensao:
-        quebra = citar(indicador.dimensao)
-        resultado = await conexao.fetch(
-            f"select {quebra}::text as rotulo, {_conta(indicador)} as valor"
-            f" from {de}{onde} group by 1 order by 2 desc nulls last"
-            f" limit {LIMITE_QUEBRA}"
-        )
-        linhas = [
-            {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
-            for r in resultado
-        ]
+    return {
+        "valor": _numero(valor),
+        "linhas": await _serie(conexao, de, onde, indicador),
+    }
 
-    return {"valor": _numero(valor), "linhas": linhas}
+
+async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
+    if indicador.grafico == "linha" and indicador.tempo:
+        balde = BALDES.get(indicador.periodo or "", BALDE_LARGO)
+        sql = (
+            f"select date_trunc('{balde}', {citar(indicador.tempo)})::date::text"
+            f" as rotulo, {_conta(indicador)} as valor from {de}{onde}"
+            f" group by 1 order by 1 limit {LIMITE_SERIE}"
+        )
+    elif indicador.dimensao:
+        sql = (
+            f"select {citar(indicador.dimensao)}::text as rotulo,"
+            f" {_conta(indicador)} as valor from {de}{onde}"
+            f" group by 1 order by 2 desc nulls last limit {LIMITE_QUEBRA}"
+        )
+    else:
+        return []
+
+    return [
+        {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
+        for r in await conexao.fetch(sql)
+    ]
 
 
 # Uma conexao para todos: indicador que falha nao derruba os outros.
