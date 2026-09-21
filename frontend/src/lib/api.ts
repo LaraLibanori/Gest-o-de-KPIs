@@ -159,9 +159,19 @@ export const AGREGACOES: Record<Agregacao, string> = {
   soma: "Soma",
   media: "Média",
   contagem: "Contagem",
-  distintos: "Quantidade de",
+  distintos: "Quantidade",
   minimo: "Menor",
   maximo: "Maior",
+};
+
+// Como o indicador se le por extenso, no cartao do painel.
+export const FRASES: Record<Agregacao, (campo: string) => string> = {
+  soma: (c) => `Soma de ${c}`,
+  media: (c) => `Média de ${c}`,
+  contagem: () => "Contagem de registros",
+  distintos: (c) => `Quantidade de ${c}`,
+  minimo: (c) => `Menor ${c}`,
+  maximo: (c) => `Maior ${c}`,
 };
 
 export const PERIODOS: Record<Periodo, string> = {
@@ -179,4 +189,18 @@ export type IndicadorNovo = {
   dimensao: string | null;
   tempo: string | null;
   periodo: Periodo | null;
+};
+
+export type Quebra = { rotulo: string; valor: number | null };
+
+export type IndicadorCalculado = Indicador & {
+  valor: number | null;
+  linhas: Quebra[];
+  erro: string | null;
+};
+
+export type Painel = {
+  tabela: string | null;
+  indicadores: IndicadorCalculado[];
+  erro: string | null;
 };
