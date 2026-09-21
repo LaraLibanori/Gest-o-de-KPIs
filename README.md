@@ -17,8 +17,8 @@ senha    admin123
 Também dá para criar a sua na própria tela de login: a conta já entra ativa,
 sem confirmar e-mail.
 
-Por enquanto estão prontos o login, as organizações, o cadastro das conexões e
-a definição dos indicadores. Os painéis vêm depois.
+Por enquanto estão prontos o login, as organizações, o cadastro das conexões,
+a definição dos indicadores e o painel que calcula cada um deles.
 
 ## Como funciona
 
@@ -168,6 +168,7 @@ distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 | POST   | `/api/organizacoes/{id}/conexoes/{cid}/indicadores` |
 | POST   | `/api/.../indicadores/propor`                     |
 | PATCH  | `/api/.../indicadores/{iid}`                      |
+| GET    | `/api/organizacoes/{id}/conexoes/{cid}/painel`    |
 | DELETE | `/api/.../indicadores/{iid}`                      |
 | GET    | `/api/segmentos`                                  |
 | DELETE | `/api/organizacoes/{id}/conexoes/{cid}`           |
@@ -184,4 +185,5 @@ entra na organização quando se cadastrar.
 - [x] Sugestão de rótulo e papel por LLM
 - [x] Indicadores por ramo de negócio, com confirmação dos campos
 - [ ] Campos calculados
+- [x] Painel com os indicadores calculados no banco do cliente
 - [ ] Dashboards com os indicadores da organização

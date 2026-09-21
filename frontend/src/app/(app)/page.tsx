@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   CircleCheck,
   CircleSlash,
@@ -252,19 +253,25 @@ export default function Conexoes() {
                       Continuar
                     </Button>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => verificar(c)}
-                      disabled={verificando === c.id}
-                    >
-                      {verificando === c.id ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <RefreshCw />
-                      )}
-                      Verificar
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={() => verificar(c)}
+                        disabled={verificando === c.id}
+                        aria-label={`Verificar ${c.nome}`}
+                      >
+                        {verificando === c.id ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <RefreshCw />
+                        )}
+                      </Button>
+                      <Button size="sm" asChild>
+                        <Link href={`/conexoes/${c.id}`}>Ver painel</Link>
+                      </Button>
+                    </>
                   )}
                   {souDono && (
                     <DropdownMenu>
