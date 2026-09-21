@@ -6,7 +6,15 @@ from sqlalchemy import delete, func, select
 from ..auth import CurrentUser
 from ..calculo import calcular
 from ..db import Sessao
-from ..indicadores import PAPEIS_ACEITOS, QUANTOS, casar, por_regra
+from ..indicadores import (
+    PAPEIS_ACEITOS,
+    QUANTOS,
+    casar,
+    formas_possiveis,
+    por_regra,
+    sugerir_grafico,
+)
+from ..llm import sugerir_graficos
 from ..models import Campo as CampoDb
 from ..models import Indicador as IndicadorDb
 from ..models import SegmentoKpi as KpiDb
@@ -19,6 +27,7 @@ from ..schemas import (
     Painel,
     Proposta,
     Quebra,
+    SugestaoGrafico,
 )
 from .comum import PREFIXO, buscar, campos, consultar
 
@@ -26,6 +35,9 @@ router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
 
 
 def _conferir(dados, campos: list[CampoDb], agregacao: str) -> None:
+    forma = getattr(dados, "grafico", None)
+    if forma and forma not in formas_possiveis(dados):
+        raise HTTPException(422, f"{forma} precisa de mais um campo para funcionar")
     por_nome = {c.coluna: c for c in campos}
     exigidos = [
         (dados.coluna, PAPEIS_ACEITOS[agregacao]),
@@ -110,6 +122,7 @@ async def propor(
                     "dimensao": None,
                     "tempo": tempo,
                     "periodo": "sempre",
+                    "grafico": "numero",
                     "origem": "segmento",
                 }
             )
@@ -204,6 +217,9 @@ async def ajustar_indicador(
     mudancas = body.model_dump(exclude_unset=True)
     for nome, valor in mudancas.items():
         setattr(indicador, nome, valor)
+    # Escolheu a quebra e nao mexeu na forma: numero vira barra sozinho.
+    if "dimensao" in mudancas and "grafico" not in mudancas:
+        indicador.grafico = sugerir_grafico(indicador.dimensao)
     _conferir(indicador, await campos(sessao, conexao_id), indicador.agregacao)
 
     await sessao.flush()
@@ -230,6 +246,55 @@ async def remover_indicador(
     if resultado.rowcount == 0:
         raise HTTPException(404, "indicador não encontrado")
     await sessao.commit()
+
+
+# So troca a forma de quem a llm acertou: o que ela sugerir fora do possivel cai.
+@router.post("/{conexao_id}/indicadores/graficos", response_model=SugestaoGrafico)
+async def sugerir_formas(
+    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "sugerir gráficos")
+    await buscar(sessao, organizacao_id, conexao_id)
+    linhas = list(
+        await sessao.scalars(
+            select(IndicadorDb)
+            .where(IndicadorDb.conexao_id == conexao_id)
+            .order_by(IndicadorDb.ordem)
+        )
+    )
+    escolhas = await sugerir_graficos(
+        [
+            {
+                "nome": i.nome,
+                "agregacao": i.agregacao,
+                "campo": i.coluna,
+                "quebra": i.dimensao,
+                "tempo": i.tempo,
+                "periodo": i.periodo,
+                "formas": formas_possiveis(i),
+            }
+            for i in linhas
+        ]
+    )
+
+    aplicadas = 0
+    for indicador in linhas:
+        forma = escolhas.get(indicador.nome)
+        if (
+            forma
+            and forma != indicador.grafico
+            and forma in formas_possiveis(indicador)
+        ):
+            indicador.grafico = forma
+            aplicadas += 1
+
+    await sessao.flush()
+    resposta = SugestaoGrafico(
+        aplicadas=aplicadas,
+        indicadores=[Indicador.model_validate(i) for i in linhas],
+    )
+    await sessao.commit()
+    return resposta
 
 
 # Abre o banco do cliente uma vez e calcula todos os indicadores nele.

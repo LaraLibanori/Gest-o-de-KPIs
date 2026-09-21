@@ -25,6 +25,9 @@ TEMPO_LIMITE = 20
 DESCANSO = 300
 TENTATIVAS = 3
 
+# Erro de conta inteira: insistir nos outros modelos do mesmo provedor nao ajuda.
+CONTA_FORA = ("RateLimitError", "AuthenticationError", "PermissionDeniedError")
+
 # Em ingles porque os modelos pequenos seguem melhor; a saida continua em portugues.
 INSTRUCAO = """You classify the columns of a business database table so that a
 non-technical user can build KPI dashboards from them.
@@ -73,9 +76,45 @@ def _esquema(colunas: list[str]) -> type[BaseModel]:
         )
 
     class Sugestoes(BaseModel):
-        colunas: list[Coluna]
+        itens: list[Coluna]
 
     return Sugestoes
+
+
+GRAFICO = Literal["numero", "barra", "linha", "pizza", "tabela"]
+
+INSTRUCAO_GRAFICO = """You choose how each KPI is shown on a dashboard.
+
+Forms:
+- `numero`: one headline value. The default when there is nothing to break it by.
+- `barra`: ranked horizontal bars, one per category. Best to compare magnitude.
+- `linha`: a trend over time. Only when the KPI follows a date.
+- `pizza`: share of one whole. Only for few categories that add up to the total,
+  and never to compare values that are close to each other.
+- `tabela`: a plain table. Best when there are many categories, or when the exact
+  numbers matter more than the shape.
+
+Rules:
+- Every KPI lists the forms it can support in `formas`. Pick only from that list.
+- `numero` is the default for a headline figure. Most KPIs carry a date column,
+  and that alone is not a reason for `linha`: pick `linha` only when the KPI is
+  about how something evolves, not about its current size.
+- With a breakdown, prefer `barra`. Use `pizza` only when the categories are few
+  and clearly parts of one whole; `tabela` when there are many of them.
+- Return exactly one entry per KPI received, using the name you were given."""
+
+
+def _esquema_grafico(nomes: list[str]) -> type[BaseModel]:
+    class Escolha(BaseModel):
+        indicador: Literal[tuple(nomes)] = Field(  # type: ignore[valid-type]
+            description="exact KPI name, as received"
+        )
+        grafico: GRAFICO = Field(description="one of the forms listed for that KPI")
+
+    class Escolhas(BaseModel):
+        itens: list[Escolha]
+
+    return Escolhas
 
 
 _modelos: list[str] | None = None
@@ -166,7 +205,9 @@ async def _montar(disponiveis: list[str]):
     return _roteador
 
 
-async def _perguntar(mensagens: list[dict], colunas: list[str]) -> list | None:
+async def _perguntar(
+    mensagens: list[dict], esquema, esperadas: set[str], chave: str
+) -> list | None:
     disponiveis = await modelos()
     if not disponiveis:
         return None
@@ -177,12 +218,14 @@ async def _perguntar(mensagens: list[dict], colunas: list[str]) -> list | None:
     litellm.suppress_debug_info = True
     logging.getLogger("LiteLLM").setLevel(logging.CRITICAL)
 
-    esquema = _esquema(colunas)
     roteador = await _montar(disponiveis)
-    esperadas = set(colunas)
     melhor: list = []
 
-    for modelo in disponiveis[:TENTATIVAS]:
+    fila = list(disponiveis)
+    tentativas = 0
+    while fila and tentativas < TENTATIVAS:
+        modelo = fila.pop(0)
+        tentativas += 1
         try:
             resposta = await roteador.acompletion(
                 model=modelo,
@@ -194,16 +237,22 @@ async def _perguntar(mensagens: list[dict], colunas: list[str]) -> list | None:
         except ValidationError:
             registro.warning("%s respondeu fora do formato", modelo)
             continue
-        except Exception:  # noqa: BLE001 - sugestao nunca pode derrubar o catalogo
-            registro.warning("%s não respondeu", modelo)
+        except Exception as e:  # noqa: BLE001 - sugestao nunca derruba o catalogo
+            if type(e).__name__ in CONTA_FORA:
+                provedor = modelo.split("/", 1)[0]
+                fila = [m for m in fila if not m.startswith(f"{provedor}/")]
+                tentativas -= 1
+                registro.warning("%s fora: pulando o provedor", provedor)
+            else:
+                registro.warning("%s não respondeu", modelo)
             continue
 
-        vistas = {c.coluna for c in dados.colunas}
+        vistas = {getattr(c, chave) for c in dados.itens}
         if vistas == esperadas:
-            return dados.colunas
+            return dados.itens
         registro.warning("%s deixou de fora %d coluna", modelo, len(esperadas - vistas))
         if len(vistas) > len(melhor):
-            melhor = dados.colunas
+            melhor = dados.itens
 
     return melhor or None
 
@@ -233,9 +282,31 @@ async def sugerir(
             {"role": "system", "content": INSTRUCAO},
             {"role": "user", "content": json.dumps(pergunta, ensure_ascii=False)},
         ],
-        colunas,
+        _esquema(colunas),
+        set(colunas),
+        "coluna",
     )
     if not sugeridas:
         return {}
     conhecidas = set(colunas)
     return {s.coluna: s for s in sugeridas if s.coluna in conhecidas}
+
+
+# A forma volta presa a lista fechada; o que nao servir cai fora depois.
+async def sugerir_graficos(indicadores: list[dict]) -> dict[str, str]:
+    if not disponivel() or not indicadores:
+        return {}
+
+    nomes = [i["nome"] for i in indicadores]
+    escolhas = await _perguntar(
+        [
+            {"role": "system", "content": INSTRUCAO_GRAFICO},
+            {"role": "user", "content": json.dumps(indicadores, ensure_ascii=False)},
+        ],
+        _esquema_grafico(nomes),
+        set(nomes),
+        "indicador",
+    )
+    if not escolhas:
+        return {}
+    return {e.indicador: e.grafico for e in escolhas if e.indicador in set(nomes)}
