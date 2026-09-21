@@ -168,6 +168,7 @@ distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 | POST   | `/api/organizacoes/{id}/conexoes/{cid}/indicadores` |
 | POST   | `/api/.../indicadores/propor`                     |
 | PATCH  | `/api/.../indicadores/{iid}`                      |
+| POST   | `/api/.../indicadores/graficos`                   |
 | GET    | `/api/organizacoes/{id}/conexoes/{cid}/painel`    |
 | DELETE | `/api/.../indicadores/{iid}`                      |
 | GET    | `/api/segmentos`                                  |
@@ -186,4 +187,5 @@ entra na organização quando se cadastrar.
 - [x] Indicadores por ramo de negócio, com confirmação dos campos
 - [ ] Campos calculados
 - [x] Painel com os indicadores calculados no banco do cliente
+- [x] Tipo de gráfico sugerido e trocável, com número, barra, linha, pizza e tabela
 - [ ] Dashboards com os indicadores da organização

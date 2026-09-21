@@ -4,8 +4,11 @@ import { useState } from "react";
 import { Loader2, Plus, TriangleAlert, X } from "lucide-react";
 import {
   AGREGACOES,
+  GRAFICOS,
   PAPEIS_ACEITOS,
   PERIODOS,
+  formasPossiveis,
+  type Grafico,
   type Agregacao,
   type Campo,
   type Indicador,
@@ -190,6 +193,7 @@ export default function PassoIndicadores({
   descartados,
   ocupado,
   onTrocarColuna,
+  onTrocarGrafico,
   onRemover,
   onCriar,
   onFechar,
@@ -200,6 +204,7 @@ export default function PassoIndicadores({
   descartados: { nome: string; motivo: string }[];
   ocupado: boolean;
   onTrocarColuna: (indicador: Indicador, coluna: string | null) => void;
+  onTrocarGrafico: (indicador: Indicador, grafico: Grafico) => void;
   onRemover: (indicador: Indicador) => void;
   onCriar: (novo: IndicadorNovo) => Promise<void>;
   onFechar: () => void;
@@ -258,15 +263,32 @@ export default function PassoIndicadores({
                     <X className="size-3.5" />
                   </Button>
                 </div>
-                {papeis.length > 0 && (
-                  <Campos
-                    campos={campos}
-                    papeis={papeis}
-                    valor={i.coluna}
-                    vazio="escolha o campo"
-                    onMudar={(v) => onTrocarColuna(i, v)}
-                  />
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {papeis.length > 0 && (
+                    <Campos
+                      campos={campos}
+                      papeis={papeis}
+                      valor={i.coluna}
+                      vazio="escolha o campo"
+                      onMudar={(v) => onTrocarColuna(i, v)}
+                    />
+                  )}
+                  <Select
+                    value={i.grafico}
+                    onValueChange={(v) => onTrocarGrafico(i, v as Grafico)}
+                  >
+                    <SelectTrigger size="sm" className="w-auto min-w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formasPossiveis(i).map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {GRAFICOS[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             );
           })

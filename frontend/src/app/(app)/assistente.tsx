@@ -7,12 +7,14 @@ import {
   api,
   type Campo,
   type Conexao,
+  type Grafico,
   type Indicador,
   type IndicadorNovo,
   type PapelCampo,
   type Proposta,
   type Relacao,
   type Segmento,
+  type SugestaoGrafico,
   type Sugestao,
   type Verificacao,
 } from "@/lib/api";
@@ -259,10 +261,47 @@ export default function Assistente({
       setIndicadores(p.indicadores);
       setDescartados(p.descartados);
       setMudou(true);
+      sugerirGraficos(atual.id);
     } catch (e) {
       falhar(e);
     } finally {
       setOcupado(false);
+    }
+  }
+
+  // Sugestao de forma: se a llm nao responder, a escolhida por regra continua.
+  const sugerirGraficos = useCallback(
+    async (id: string) => {
+      try {
+        const r = await api<SugestaoGrafico>(
+          `${base}/${id}/indicadores/graficos`,
+          {
+            method: "POST",
+          },
+        );
+        if (r.aplicadas > 0) setIndicadores(r.indicadores);
+      } catch {
+        // sem sugestao a forma por regra continua valendo
+      }
+    },
+    [base],
+  );
+
+  async function trocarGrafico(indicador: Indicador, grafico: Grafico) {
+    if (!atual) return;
+    setIndicadores((lista) =>
+      lista.map((i) => (i.id === indicador.id ? { ...i, grafico } : i)),
+    );
+    try {
+      await api<Indicador>(`${base}/${atual.id}/indicadores/${indicador.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ grafico }),
+      });
+    } catch (e) {
+      falhar(e);
+      setIndicadores((lista) =>
+        lista.map((i) => (i.id === indicador.id ? indicador : i)),
+      );
     }
   }
 
@@ -410,6 +449,7 @@ export default function Assistente({
             descartados={descartados}
             ocupado={ocupado}
             onTrocarColuna={trocarColuna}
+            onTrocarGrafico={trocarGrafico}
             onRemover={removerIndicador}
             onCriar={criarIndicador}
             onFechar={() => onFechar(mudou)}
