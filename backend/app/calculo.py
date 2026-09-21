@@ -1,9 +1,16 @@
+import logging
+import time
+
 import asyncpg
 
 from .introspeccao import citar, partir, qualificar
 
+registro = logging.getLogger("kpi")
+
 LIMITE_QUEBRA = 12
-TEMPO_CONSULTA = 8000
+TEMPO_CONSULTA = 4000
+# 8s de conexao mais isto cabem nos 15s que o navegador espera.
+ORCAMENTO = 6
 
 AGREGACOES = {
     "soma": "sum({})",
@@ -33,6 +40,7 @@ LIMITE_SERIE = 200
 
 SEM_CAMPO = "escolha o campo do indicador"
 SEM_COLUNA = "a coluna não existe mais na tabela"
+SEM_TEMPO = "o banco demorou demais, atualize para tentar de novo"
 
 
 def _conta(indicador) -> str:
@@ -57,13 +65,17 @@ async def _um(conexao: asyncpg.Connection, tabela: str, indicador) -> dict:
     onde = _recorte(indicador)
     valor = await conexao.fetchval(f"select {_conta(indicador)} from {de}{onde}")
 
-    return {
-        "valor": _numero(valor),
-        "linhas": await _serie(conexao, de, onde, indicador),
-    }
+    # Quebra que falha nao leva junto o numero que ja veio.
+    try:
+        linhas = await _serie(conexao, de, onde, indicador)
+    except asyncpg.PostgresError:
+        linhas = []
+    return {"valor": _numero(valor), "linhas": linhas}
 
 
 async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
+    if indicador.grafico == "numero":
+        return []
     if indicador.grafico == "linha" and indicador.tempo:
         balde = BALDES.get(indicador.periodo or "", BALDE_LARGO)
         sql = (
@@ -89,12 +101,19 @@ async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
 # Uma conexao para todos: indicador que falha nao derruba os outros.
 async def calcular(conexao: asyncpg.Connection, tabela: str, indicadores) -> dict:
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
+    prazo = time.monotonic() + ORCAMENTO
     resultados = {}
     for indicador in indicadores:
+        if time.monotonic() > prazo:
+            resultados[str(indicador.id)] = {"erro": SEM_TEMPO}
+            continue
         try:
             resultados[str(indicador.id)] = await _um(conexao, tabela, indicador)
         except asyncpg.UndefinedColumnError:
             resultados[str(indicador.id)] = {"erro": SEM_COLUNA}
         except asyncpg.PostgresError as e:
             resultados[str(indicador.id)] = {"erro": str(e).split("\n")[0]}
+        except Exception:  # noqa: BLE001 - um indicador nao derruba o painel
+            registro.exception("falha ao calcular %s", indicador.nome)
+            resultados[str(indicador.id)] = {"erro": "não foi possível calcular"}
     return resultados
