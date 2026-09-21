@@ -285,6 +285,7 @@ async def sugerir_formas(
             select(IndicadorDb)
             .where(IndicadorDb.conexao_id == conexao_id)
             .order_by(IndicadorDb.ordem)
+            .execution_options(populate_existing=True)
         )
     )
     aplicadas = 0
