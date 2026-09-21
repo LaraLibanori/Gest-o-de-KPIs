@@ -1,10 +1,22 @@
 from dataclasses import dataclass
 
-from app.calculo import _conta, _recorte, _serie
+import asyncpg
+
+from app.calculo import (
+    CAIU,
+    SEM_CAMPO,
+    SEM_COLUNA,
+    SEM_NUMERO,
+    _conta,
+    _recorte,
+    _serie,
+    calcular,
+)
 
 
 @dataclass
 class Indicador:
+    id: str = "1"
     agregacao: str = "soma"
     coluna: str | None = "valor_total"
     tempo: str | None = None
@@ -83,3 +95,88 @@ async def test_quebra_cita_a_dimensao():
     )
     assert '"cat""; drop table v; --"' in conexao.sql
     assert "limit 12" in conexao.sql
+
+
+class ConexaoContada:
+    def __init__(self, quebrar="", erro=None, texto=False):
+        self.quebrar = quebrar
+        self.erro = erro or asyncpg.UndefinedColumnError("column does not exist")
+        self.texto = texto
+        self.selects = []
+
+    def _ver(self, sql):
+        if sql.startswith("select"):
+            self.selects.append(sql)
+        if self.quebrar and self.quebrar in sql:
+            raise self.erro
+
+    async def execute(self, sql):
+        self._ver(sql)
+
+    async def fetchrow(self, sql):
+        self._ver(sql)
+        bruto = "texto" if self.texto else 1
+        return {f"v{n}": bruto for n in range(sql.count(" as v"))}
+
+    async def fetchval(self, sql):
+        self._ver(sql)
+        return 1
+
+    async def fetch(self, sql):
+        self._ver(sql)
+        return []
+
+
+async def test_mesmo_recorte_vai_num_select_so():
+    conexao = ConexaoContada()
+    painel = [
+        Indicador(id="a", periodo="ultimos_30_dias", tempo="vendida_em"),
+        Indicador(
+            id="b", agregacao="media", periodo="ultimos_30_dias", tempo="vendida_em"
+        ),
+    ]
+    await calcular(conexao, "exemplo.vendas", painel)
+    assert len(conexao.selects) == 1
+
+
+async def test_recortes_diferentes_vao_em_selects_separados():
+    conexao = ConexaoContada()
+    painel = [
+        Indicador(id="a", periodo="ultimos_7_dias", tempo="vendida_em"),
+        Indicador(id="b", periodo="ano_atual", tempo="vendida_em"),
+    ]
+    await calcular(conexao, "exemplo.vendas", painel)
+    assert len(conexao.selects) == 2
+
+
+async def test_coluna_que_sumiu_nao_leva_o_lote_junto():
+    conexao = ConexaoContada(quebrar="sumiu")
+    painel = [Indicador(id="a"), Indicador(id="b", coluna="sumiu")]
+    resultado = await calcular(conexao, "exemplo.vendas", painel)
+    assert resultado["a"]["valor"] == 1
+    assert resultado["b"]["erro"] == SEM_COLUNA
+
+
+async def test_indicador_sem_campo_nem_consulta():
+    conexao = ConexaoContada()
+    resultado = await calcular(
+        conexao, "exemplo.vendas", [Indicador(id="a", coluna=None)]
+    )
+    assert resultado["a"]["erro"] == SEM_CAMPO
+    assert conexao.selects == []
+
+
+async def test_texto_onde_esperava_numero_erra_so_um():
+    conexao = ConexaoContada(texto=True)
+    resultado = await calcular(conexao, "exemplo.vendas", [Indicador(id="a")])
+    assert resultado["a"]["erro"] == SEM_NUMERO
+
+
+async def test_conexao_caida_nao_refaz_um_por_um():
+    conexao = ConexaoContada(
+        quebrar="select", erro=asyncpg.ConnectionDoesNotExistError("caiu")
+    )
+    painel = [Indicador(id="a"), Indicador(id="b"), Indicador(id="c")]
+    resultado = await calcular(conexao, "exemplo.vendas", painel)
+    assert len(conexao.selects) == 1
+    assert all(resultado[i]["erro"] == CAIU for i in "abc")

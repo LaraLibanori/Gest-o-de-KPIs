@@ -9,7 +9,7 @@ registro = logging.getLogger("kpi")
 
 LIMITE_QUEBRA = 12
 TEMPO_CONSULTA = 4000
-# 8s de conexao mais isto cabem nos 15s que o navegador espera.
+# Teto do calculo em si; o navegador desiste da pagina em 15s.
 ORCAMENTO = 6
 
 AGREGACOES = {
@@ -40,7 +40,9 @@ LIMITE_SERIE = 200
 
 SEM_CAMPO = "escolha o campo do indicador"
 SEM_COLUNA = "a coluna não existe mais na tabela"
+SEM_NUMERO = "a coluna não guarda número"
 SEM_TEMPO = "o banco demorou demais, atualize para tentar de novo"
+CAIU = "a conexão com o banco caiu"
 
 
 def _conta(indicador) -> str:
@@ -57,20 +59,54 @@ def _numero(valor) -> float | None:
     return None if valor is None else float(valor)
 
 
-async def _um(conexao: asyncpg.Connection, tabela: str, indicador) -> dict:
-    if indicador.agregacao != "contagem" and not indicador.coluna:
-        return {"erro": SEM_CAMPO}
-
-    de = qualificar(*partir(tabela))
-    onde = _recorte(indicador)
-    valor = await conexao.fetchval(f"select {_conta(indicador)} from {de}{onde}")
-
-    # Quebra que falha nao leva junto o numero que ja veio.
+# Texto onde se esperava numero e problema de um indicador, nao do lote.
+def _valor(bruto) -> dict:
     try:
-        linhas = await _serie(conexao, de, onde, indicador)
-    except asyncpg.PostgresError:
-        linhas = []
-    return {"valor": _numero(valor), "linhas": linhas}
+        return {"valor": _numero(bruto), "linhas": []}
+    except (TypeError, ValueError):
+        return {"erro": SEM_NUMERO}
+
+
+def _caiu(erro: Exception) -> bool:
+    return isinstance(erro, asyncpg.PostgresConnectionError | asyncpg.InterfaceError)
+
+
+def _falha(erro: Exception) -> dict:
+    if isinstance(erro, asyncpg.UndefinedColumnError):
+        return {"erro": SEM_COLUNA}
+    if _caiu(erro):
+        return {"erro": CAIU}
+    if isinstance(erro, asyncpg.PostgresError):
+        return {"erro": str(erro).split("\n")[0]}
+    registro.exception("falha inesperada ao calcular")
+    return {"erro": "não foi possível calcular"}
+
+
+# Mesmo recorte cabe num select so; se ele falhar, refaz um por um para o erro
+# ficar no indicador certo.
+async def _valores(conexao, de: str, onde: str, grupo: list, prazo: float) -> dict:
+    try:
+        campos = ", ".join(f"{_conta(i)} as v{n}" for n, i in enumerate(grupo))
+        linha = await conexao.fetchrow(f"select {campos} from {de}{onde}")
+        return {str(i.id): _valor(linha[f"v{n}"]) for n, i in enumerate(grupo)}
+    except Exception as e:  # noqa: BLE001 - o culpado aparece na segunda passada
+        saida = {str(i.id): _falha(e) for i in grupo}
+        if _caiu(e):
+            return saida
+
+    for indicador in grupo:
+        if time.monotonic() > prazo:
+            break
+        try:
+            bruto = await conexao.fetchval(
+                f"select {_conta(indicador)} from {de}{onde}"
+            )
+            saida[str(indicador.id)] = _valor(bruto)
+        except Exception as e:  # noqa: BLE001 - um indicador nao derruba o grupo
+            saida[str(indicador.id)] = _falha(e)
+            if _caiu(e):
+                break
+    return saida
 
 
 async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
@@ -102,18 +138,29 @@ async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
 async def calcular(conexao: asyncpg.Connection, tabela: str, indicadores) -> dict:
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     prazo = time.monotonic() + ORCAMENTO
-    resultados = {}
+    de = qualificar(*partir(tabela))
+
+    resultados: dict[str, dict] = {}
+    grupos: dict[str, list] = {}
     for indicador in indicadores:
+        if indicador.agregacao != "contagem" and not indicador.coluna:
+            resultados[str(indicador.id)] = {"erro": SEM_CAMPO}
+            continue
+        grupos.setdefault(_recorte(indicador), []).append(indicador)
+
+    for onde, grupo in grupos.items():
         if time.monotonic() > prazo:
-            resultados[str(indicador.id)] = {"erro": SEM_TEMPO}
+            resultados.update({str(i.id): {"erro": SEM_TEMPO} for i in grupo})
+            continue
+        resultados.update(await _valores(conexao, de, onde, grupo, prazo))
+
+    # A quebra vem depois: o numero ja esta na mao e o desenho e o que pode faltar.
+    for indicador in indicadores:
+        dados = resultados[str(indicador.id)]
+        if "erro" in dados or time.monotonic() > prazo:
             continue
         try:
-            resultados[str(indicador.id)] = await _um(conexao, tabela, indicador)
-        except asyncpg.UndefinedColumnError:
-            resultados[str(indicador.id)] = {"erro": SEM_COLUNA}
-        except asyncpg.PostgresError as e:
-            resultados[str(indicador.id)] = {"erro": str(e).split("\n")[0]}
-        except Exception:  # noqa: BLE001 - um indicador nao derruba o painel
-            registro.exception("falha ao calcular %s", indicador.nome)
-            resultados[str(indicador.id)] = {"erro": "não foi possível calcular"}
+            dados["linhas"] = await _serie(conexao, de, _recorte(indicador), indicador)
+        except Exception:  # noqa: BLE001 - sem a quebra o numero ainda serve
+            registro.exception("falha na quebra de %s", indicador.nome)
     return resultados
