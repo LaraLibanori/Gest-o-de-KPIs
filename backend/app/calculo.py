@@ -7,9 +7,8 @@ from .introspeccao import citar, partir, qualificar
 
 registro = logging.getLogger("kpi")
 
-LIMITE_QUEBRA = 12
+LIMITE_QUEBRA = 10
 TEMPO_CONSULTA = 4000
-# Teto do calculo em si; o navegador desiste da pagina em 15s.
 ORCAMENTO = 6
 
 AGREGACOES = {
@@ -21,22 +20,18 @@ AGREGACOES = {
     "maximo": "max({})",
 }
 
-# Fragmentos fixos: o periodo vem de lista fechada, nunca de texto do usuario.
-RECORTES = {
-    "ultimos_7_dias": "current_date - 7",
-    "ultimos_30_dias": "current_date - 30",
-    "ultimos_90_dias": "current_date - 90",
-    "ano_atual": "date_trunc('year', current_date)",
+# A janela vem da requisicao, nao do indicador: assim um controle so move todos
+# os numeros da tela. Os fragmentos sao fixos, nunca texto do usuario.
+# (de onde comeca agora, de onde comeca a janela anterior, balde da serie)
+JANELAS: dict[str, tuple[str, str, str]] = {
+    "7d": ("current_date - 7", "current_date - 14", "day"),
+    "30d": ("current_date - 30", "current_date - 60", "day"),
+    "90d": ("current_date - 90", "current_date - 180", "week"),
+    "12m": ("current_date - 365", "current_date - 730", "month"),
+    "tudo": ("", "", "month"),
 }
-
-# O balde acompanha a janela: semana curta vira dia, ano vira mes.
-BALDES = {
-    "ultimos_7_dias": "day",
-    "ultimos_30_dias": "day",
-    "ultimos_90_dias": "week",
-}
-BALDE_LARGO = "month"
-LIMITE_SERIE = 200
+JANELA_PADRAO = "30d"
+LIMITE_SERIE = 400
 
 SEM_CAMPO = "escolha o campo do indicador"
 SEM_COLUNA = "a coluna não existe mais na tabela"
@@ -45,26 +40,34 @@ SEM_TEMPO = "o banco demorou demais, atualize para tentar de novo"
 CAIU = "a conexão com o banco caiu"
 
 
+def janela_de(nome: str | None) -> tuple[str, str, str]:
+    return JANELAS.get(nome or "", JANELAS[JANELA_PADRAO])
+
+
 def _conta(indicador) -> str:
     return AGREGACOES[indicador.agregacao].format(citar(indicador.coluna or ""))
 
 
-def _recorte(indicador) -> str:
-    if not indicador.tempo or indicador.periodo not in RECORTES:
+def _filtro(coluna: str | None, inicio: str, fim: str = "") -> str:
+    if not coluna or not inicio:
         return ""
-    return f" where {citar(indicador.tempo)} >= {RECORTES[indicador.periodo]}"
+    return f"{citar(coluna)} >= {inicio}{fim}"
+
+
+def _onde(coluna: str | None, inicio: str, fim: str = "") -> str:
+    condicao = _filtro(coluna, inicio, fim)
+    return f" where {condicao}" if condicao else ""
 
 
 def _numero(valor) -> float | None:
     return None if valor is None else float(valor)
 
 
-# Texto onde se esperava numero e problema de um indicador, nao do lote.
-def _valor(bruto) -> dict:
-    try:
-        return {"valor": _numero(bruto), "linhas": []}
-    except (TypeError, ValueError):
-        return {"erro": SEM_NUMERO}
+def variacao(agora: float | None, antes: float | None) -> float | None:
+    # Base zero nao tem variacao: dividir por zero e dizer "infinito" e mentira.
+    if agora is None or not antes:
+        return None
+    return (agora - antes) / abs(antes) * 100
 
 
 def _caiu(erro: Exception) -> bool:
@@ -82,85 +85,144 @@ def _falha(erro: Exception) -> dict:
     return {"erro": "não foi possível calcular"}
 
 
-# Mesmo recorte cabe num select so; se ele falhar, refaz um por um para o erro
-# ficar no indicador certo.
-async def _valores(conexao, de: str, onde: str, grupo: list, prazo: float) -> dict:
-    try:
-        campos = ", ".join(f"{_conta(i)} as v{n}" for n, i in enumerate(grupo))
-        linha = await conexao.fetchrow(f"select {campos} from {de}{onde}")
-        return {str(i.id): _valor(linha[f"v{n}"]) for n, i in enumerate(grupo)}
-    except Exception as e:  # noqa: BLE001 - o culpado aparece na segunda passada
-        saida = {str(i.id): _falha(e) for i in grupo}
-        if _caiu(e):
-            return saida
+# Agora e antes saem no mesmo select, com cada janela dentro do seu filter.
+# Nao pode haver where externo: o filtro de agregacao e aplicado sobre as linhas
+# que sobraram do where, e a janela anterior nunca casaria com nenhuma delas.
+async def _valores(
+    conexao, de: str, atual: str, antes: str, grupo: list, onde_atual: str = ""
+) -> dict:
+    def conta(indicador, filtro: str) -> str:
+        base = _conta(indicador)
+        return f"{base} filter (where {filtro})" if filtro else base
 
-    for indicador in grupo:
-        if time.monotonic() > prazo:
-            break
+    campos = []
+    for n, indicador in enumerate(grupo):
+        if antes:
+            campos.append(f"{conta(indicador, antes)} as a{n}")
+        campos.append(f"{conta(indicador, atual)} as v{n}")
+    campos = ", ".join(campos)
+
+    try:
+        linha = await conexao.fetchrow(f"select {campos} from {de}")
+    except Exception as e:  # noqa: BLE001 - refaz um a um para o erro ficar no indicador
+        if _caiu(e):
+            return {str(i.id): _falha(e) for i in grupo}
+        saida: dict[str, dict] = {}
+        for indicador in grupo:
+            try:
+                # Onde_atual ja vem com o " where"; passar de novo aqui geraria
+                # ">= coluna >= data" e o proprio resgate viraria syntax error.
+                bruto = await conexao.fetchval(
+                    f"select {_conta(indicador)} from {de}{onde_atual}"
+                )
+                saida[str(indicador.id)] = {"valor": _numero(bruto)}
+            except Exception as outro:  # noqa: BLE001 - um não derruba os outros
+                saida[str(indicador.id)] = _falha(outro)
+        return saida
+
+    saida = {}
+    for n, indicador in enumerate(grupo):
         try:
-            bruto = await conexao.fetchval(
-                f"select {_conta(indicador)} from {de}{onde}"
-            )
-            saida[str(indicador.id)] = _valor(bruto)
-        except Exception as e:  # noqa: BLE001 - um indicador nao derruba o grupo
-            saida[str(indicador.id)] = _falha(e)
-            if _caiu(e):
-                break
+            agora = _numero(linha[f"v{n}"])
+        except (TypeError, ValueError):
+            saida[str(indicador.id)] = {"erro": SEM_NUMERO}
+            continue
+        antes_ = _numero(linha[f"a{n}"]) if antes else None
+        saida[str(indicador.id)] = {
+            "valor": agora,
+            "anterior": antes_,
+            "variacao": variacao(agora, antes_),
+        }
     return saida
 
 
-async def _serie(conexao, de: str, onde: str, indicador) -> list[dict]:
-    if indicador.grafico == "numero":
-        return []
-    if indicador.grafico == "linha" and indicador.tempo:
-        balde = BALDES.get(indicador.periodo or "", BALDE_LARGO)
-        sql = (
-            f"select date_trunc('{balde}', {citar(indicador.tempo)})::date::text"
-            f" as rotulo, {_conta(indicador)} as valor from {de}{onde}"
-            f" group by 1 order by 1 limit {LIMITE_SERIE}"
-        )
-    elif indicador.dimensao:
-        sql = (
-            f"select {citar(indicador.dimensao)}::text as rotulo,"
-            f" {_conta(indicador)} as valor from {de}{onde}"
-            f" group by 1 order by 2 desc nulls last limit {LIMITE_QUEBRA}"
-        )
-    else:
-        return []
-
+async def _serie(conexao, de: str, onde: str, coluna: str, balde: str, conta: str):
     return [
         {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
-        for r in await conexao.fetch(sql)
+        for r in await conexao.fetch(
+            f"select date_trunc('{balde}', {citar(coluna)})::date::text as rotulo,"
+            f" {conta} as valor from {de}{onde} group by 1 order by 1"
+            f" limit {LIMITE_SERIE}"
+        )
     ]
 
 
-# Uma conexao para todos: indicador que falha nao derruba os outros.
-async def calcular(conexao: asyncpg.Connection, tabela: str, indicadores) -> dict:
+async def calcular(
+    conexao: asyncpg.Connection, tabela: str, indicadores, janela: str | None = None
+) -> dict:
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     prazo = time.monotonic() + ORCAMENTO
     de = qualificar(*partir(tabela))
+    inicio, inicio_anterior, balde = janela_de(janela)
 
-    resultados: dict[str, dict] = {}
-    grupos: dict[str, list] = {}
-    for indicador in indicadores:
-        if indicador.agregacao != "contagem" and not indicador.coluna:
-            resultados[str(indicador.id)] = {"erro": SEM_CAMPO}
-            continue
-        grupos.setdefault(_recorte(indicador), []).append(indicador)
+    com_campo = {
+        str(i.id) for i in indicadores if i.agregacao == "contagem" or i.coluna
+    }
+    validos = [i for i in indicadores if str(i.id) in com_campo]
+    resultados: dict[str, dict] = {
+        str(i.id): {"erro": SEM_CAMPO}
+        for i in indicadores
+        if str(i.id) not in com_campo
+    }
+    if not validos:
+        return resultados
 
-    for onde, grupo in grupos.items():
-        if time.monotonic() > prazo:
-            resultados.update({str(i.id): {"erro": SEM_TEMPO} for i in grupo})
-            continue
-        resultados.update(await _valores(conexao, de, onde, grupo, prazo))
+    # So quem tem coluna de data entra no filtro de periodo. indicator sem tempo
+    # conta a tabela inteira, e nao o recorte de outro indicador: caso contrario
+    # o numero dele mudaria junto com a janela sem ninguem pedir.
+    com_tempo = [i for i in validos if i.tempo]
+    sem_tempo = [i for i in validos if not i.tempo]
+    tempo = com_tempo[0].tempo if com_tempo else None
 
-    # A quebra vem depois: o numero ja esta na mao e o desenho e o que pode faltar.
-    for indicador in indicadores:
+    if time.monotonic() > prazo:
+        return {**resultados, **{str(i.id): {"erro": SEM_TEMPO} for i in validos}}
+
+    if com_tempo:
+        atual = _filtro(tempo, inicio)
+        antes = (
+            _filtro(tempo, inicio_anterior, f" and {citar(tempo)} < {inicio}")
+            if inicio_anterior
+            else ""
+        )
+        resultados.update(
+            await _valores(conexao, de, atual, antes, com_tempo, _onde(tempo, inicio))
+        )
+    if sem_tempo:
+        resultados.update(await _valores(conexao, de, "", "", sem_tempo))
+
+    for indicador in com_tempo:
         dados = resultados[str(indicador.id)]
         if "erro" in dados or time.monotonic() > prazo:
+            dados["serie"] = []
             continue
         try:
-            dados["linhas"] = await _serie(conexao, de, _recorte(indicador), indicador)
-        except Exception:  # noqa: BLE001 - sem a quebra o numero ainda serve
-            registro.exception("falha na quebra de %s", indicador.nome)
+            dados["serie"] = await _serie(
+                conexao, de, _onde(tempo, inicio), tempo, balde, _conta(indicador)
+            )
+        except Exception:  # noqa: BLE001 - sem serie o numero ainda serve
+            registro.exception("falha na serie de %s", indicador.nome)
+            dados["serie"] = []
+    for indicador in sem_tempo:
+        resultados[str(indicador.id)]["serie"] = []
     return resultados
+
+
+async def compor(
+    conexao: asyncpg.Connection,
+    tabela: str,
+    indicador,
+    dimensao: str,
+    janela: str | None = None,
+    limite: int = LIMITE_QUEBRA,
+) -> list[dict]:
+    inicio, _, _ = janela_de(janela)
+    tempo = indicador.tempo if indicador.tempo else None
+    onde = _onde(tempo, inicio)
+    return [
+        {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
+        for r in await conexao.fetch(
+            f"select {citar(dimensao)}::text as rotulo, {_conta(indicador)} as valor"
+            f" from {qualificar(*partir(tabela))}{onde} group by 1"
+            f" order by 2 desc nulls last limit {int(limite)}",
+        )
+    ]

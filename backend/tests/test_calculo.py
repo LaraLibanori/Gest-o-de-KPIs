@@ -8,9 +8,11 @@ from app.calculo import (
     SEM_COLUNA,
     SEM_NUMERO,
     _conta,
-    _recorte,
-    _serie,
+    _onde,
     calcular,
+    compor,
+    janela_de,
+    variacao,
 )
 
 
@@ -19,9 +21,9 @@ class Indicador:
     id: str = "1"
     agregacao: str = "soma"
     coluna: str | None = "valor_total"
-    tempo: str | None = None
-    periodo: str | None = None
+    tempo: str | None = "vendida_em"
     dimensao: str | None = None
+    periodo: str | None = "sempre"
     grafico: str = "numero"
 
 
@@ -29,7 +31,7 @@ class ConexaoFalsa:
     def __init__(self):
         self.sql = None
 
-    async def fetch(self, sql):
+    async def fetch(self, sql, *args):
         self.sql = sql
         return []
 
@@ -43,68 +45,51 @@ def test_contagem_nao_precisa_de_coluna():
     assert _conta(Indicador(agregacao="contagem", coluna=None)) == "count(*)"
 
 
-def test_recorte_exige_campo_de_tempo():
-    assert _recorte(Indicador(periodo="ultimos_30_dias", tempo=None)) == ""
+def test_janela_desconhecida_cai_no_padrao():
+    assert janela_de("nao-existe") == janela_de("30d")
+    assert janela_de(None) == janela_de("30d")
 
 
-def test_recorte_ignora_periodo_aberto():
-    assert _recorte(Indicador(periodo="sempre", tempo="vendida_em")) == ""
+def test_recorte_exige_coluna_de_tempo():
+    assert _onde(None, "current_date - 30") == ""
+    assert _onde("vendida_em", "") == ""
 
 
-def test_recorte_monta_o_filtro():
-    sql = _recorte(Indicador(periodo="ultimos_30_dias", tempo="vendida_em"))
-    assert sql == ' where "vendida_em" >= current_date - 30'
+def test_janela_tudo_nao_recorta():
+    inicio, antes, _ = janela_de("tudo")
+    assert inicio == "" and antes == ""
 
 
-async def test_numero_nao_consulta_a_serie():
-    conexao = ConexaoFalsa()
-    indicador = Indicador(dimensao="categoria", grafico="numero")
-    assert await _serie(conexao, '"e"."v"', "", indicador) == []
-    assert conexao.sql is None
-
-
-async def test_linha_agrupa_pelo_balde_do_periodo():
-    conexao = ConexaoFalsa()
-    await _serie(
-        conexao,
-        '"e"."v"',
-        "",
-        Indicador(grafico="linha", tempo="vendida_em", periodo="ultimos_90_dias"),
+def test_filtro_cita_a_coluna():
+    assert _onde("vendida_em", "current_date - 30") == (
+        ' where "vendida_em" >= current_date - 30'
     )
-    assert "date_trunc('week', \"vendida_em\")" in conexao.sql
 
 
-async def test_periodo_aberto_agrupa_por_mes():
-    conexao = ConexaoFalsa()
-    await _serie(
-        conexao,
-        '"e"."v"',
-        "",
-        Indicador(grafico="linha", tempo="vendida_em", periodo="sempre"),
-    )
-    assert "date_trunc('month'" in conexao.sql
+def test_variacao_usa_base_absoluta():
+    assert variacao(120, 100) == 20
+    assert variacao(80, 100) == -20
+    # Subir de -100 para 0 e subir 100%, nao descer.
+    assert variacao(0, -100) == 100
 
 
-async def test_quebra_cita_a_dimensao():
-    conexao = ConexaoFalsa()
-    await _serie(
-        conexao,
-        '"e"."v"',
-        "",
-        Indicador(dimensao='cat"; drop table v; --', grafico="barra"),
-    )
-    assert '"cat""; drop table v; --"' in conexao.sql
-    assert "limit 12" in conexao.sql
+def test_variacao_sem_base_nao_inventa_numero():
+    assert variacao(100, 0) is None
+    assert variacao(None, 100) is None
+    assert variacao(100, None) is None
 
 
 class ConexaoContada:
-    def __init__(self, quebrar="", erro=None, texto=False):
+    def __init__(self, quebrar="", erro=None, texto=False, com_antes=True):
         self.quebrar = quebrar
         self.erro = erro or asyncpg.UndefinedColumnError("column does not exist")
         self.texto = texto
+        self.com_antes = com_antes
         self.selects = []
+        self.sql = None
 
     def _ver(self, sql):
+        self.sql = sql
         if sql.startswith("select"):
             self.selects.append(sql)
         if self.quebrar and self.quebrar in sql:
@@ -116,7 +101,11 @@ class ConexaoContada:
     async def fetchrow(self, sql):
         self._ver(sql)
         bruto = "texto" if self.texto else 1
-        return {f"v{n}": bruto for n in range(sql.count(" as v"))}
+        if self.texto:
+            return {"v0": bruto}
+        if self.com_antes:
+            return {"v0": 2, "a0": 1}
+        return {"v0": 2}
 
     async def fetchval(self, sql):
         self._ver(sql)
@@ -127,40 +116,76 @@ class ConexaoContada:
         return []
 
 
-async def test_mesmo_recorte_vai_num_select_so():
+async def test_agora_e_antes_viem_no_mesmo_select():
     conexao = ConexaoContada()
-    painel = [
-        Indicador(id="a", periodo="ultimos_30_dias", tempo="vendida_em"),
-        Indicador(
-            id="b", agregacao="media", periodo="ultimos_30_dias", tempo="vendida_em"
-        ),
-    ]
-    await calcular(conexao, "exemplo.vendas", painel)
-    assert len(conexao.selects) == 1
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
+    valores = [s for s in conexao.selects if "filter" in s]
+    assert len(valores) == 1
+    # "filter (where" e a sintaxe do Postgres. Com "filter (" a query nem roda,
+    # e o erro some no fallback por indicador, levando a variacao junto.
+    assert 'sum("valor_total") filter (where "vendida_em" >=' in valores[0]
+    assert "current_date - 60" in valores[0]
+    assert "current_date - 30" in valores[0]
 
 
-async def test_recortes_diferentes_vao_em_selects_separados():
+async def test_janela_tudo_nao_pede_variacao():
     conexao = ConexaoContada()
-    painel = [
-        Indicador(id="a", periodo="ultimos_7_dias", tempo="vendida_em"),
-        Indicador(id="b", periodo="ano_atual", tempo="vendida_em"),
-    ]
-    await calcular(conexao, "exemplo.vendas", painel)
-    assert len(conexao.selects) == 2
+    resultado = await calcular(conexao, "exemplo.vendas", [Indicador()], "tudo")
+    assert not any("filter" in s for s in conexao.selects)
+    assert resultado["1"]["anterior"] is None
+    assert resultado["1"]["variacao"] is None
+
+
+async def test_a_janela_anterior_nao_pode_vir_de_where_externo():
+    # O filtro de agregacao age sobre as linhas que sobraram do where. Com where
+    # externo na janela atual, a anterior vira um recorte vazio e a variacao
+    # some sem erro nenhum: e o que aconteceu na primeira versao.
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
+    linha = next(s for s in conexao.selects if "filter" in s)
+    assert " where " not in linha.split(" from ")[0].replace("filter (where ", "")
+
+
+async def test_o_where_da_janela_vem_so_do_from():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "90d")
+    linha = next(s for s in conexao.selects if "filter" in s)
+    dentro = linha.split("filter (where ")[1].split(")")[0]
+    assert "where" not in dentro
+    assert '"vendida_em" >= current_date - 180' in dentro
+
+
+async def test_serie_agrupa_pelo_balde_da_janela():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "90d")
+    assert "date_trunc('week'" in conexao.sql
+
+
+async def test_janela_curta_agrupa_por_dia():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "7d")
+    assert "date_trunc('day'" in conexao.sql
+
+
+async def test_ano_agrupa_por_mes():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "12m")
+    assert "date_trunc('month'" in conexao.sql
 
 
 async def test_coluna_que_sumiu_nao_leva_o_lote_junto():
     conexao = ConexaoContada(quebrar="sumiu")
     painel = [Indicador(id="a"), Indicador(id="b", coluna="sumiu")]
-    resultado = await calcular(conexao, "exemplo.vendas", painel)
-    assert resultado["a"]["valor"] == 1
+    resultado = await calcular(conexao, "exemplo.vendas", painel, "30d")
+    # O lote inteiro falhou, entao cada um foi refeito e so o culpado became erro.
+    assert resultado["a"]["valor"] is not None
     assert resultado["b"]["erro"] == SEM_COLUNA
 
 
-async def test_indicador_sem_campo_nem_consulta():
+async def test_indicador_sem_campo_nao_consulta():
     conexao = ConexaoContada()
     resultado = await calcular(
-        conexao, "exemplo.vendas", [Indicador(id="a", coluna=None)]
+        conexao, "exemplo.vendas", [Indicador(id="a", coluna=None)], "30d"
     )
     assert resultado["a"]["erro"] == SEM_CAMPO
     assert conexao.selects == []
@@ -168,7 +193,7 @@ async def test_indicador_sem_campo_nem_consulta():
 
 async def test_texto_onde_esperava_numero_erra_so_um():
     conexao = ConexaoContada(texto=True)
-    resultado = await calcular(conexao, "exemplo.vendas", [Indicador(id="a")])
+    resultado = await calcular(conexao, "exemplo.vendas", [Indicador(id="a")], "30d")
     assert resultado["a"]["erro"] == SEM_NUMERO
 
 
@@ -177,6 +202,66 @@ async def test_conexao_caida_nao_refaz_um_por_um():
         quebrar="select", erro=asyncpg.ConnectionDoesNotExistError("caiu")
     )
     painel = [Indicador(id="a"), Indicador(id="b"), Indicador(id="c")]
-    resultado = await calcular(conexao, "exemplo.vendas", painel)
+    resultado = await calcular(conexao, "exemplo.vendas", painel, "30d")
     assert len(conexao.selects) == 1
     assert all(resultado[i]["erro"] == CAIU for i in "abc")
+
+
+class ComposicaoFalsa:
+    def __init__(self):
+        self.sql = None
+
+    async def fetch(self, sql, *args):
+        self.sql = sql
+        return [
+            {"rotulo": "Site", "valor": 46},
+            {"rotulo": "App", "valor": 32},
+            {"rotulo": None, "valor": 3},
+        ]
+
+
+async def test_composicao_cita_dimensao_e_ordena():
+    conexao = ComposicaoFalsa()
+    pontos = await compor(
+        conexao,
+        "exemplo.vendas",
+        Indicador(agregacao="soma"),
+        'canal"; drop table x; --',
+        "30d",
+    )
+    assert "order by 2 desc" in conexao.sql
+    assert 'canal""; drop table x; --' in conexao.sql
+    assert pontos[2]["rotulo"] == "sem valor"
+
+
+async def test_composicao_respeita_a_janela():
+    conexao = ComposicaoFalsa()
+    await compor(conexao, "exemplo.vendas", Indicador(), "canal", "90d")
+    assert "current_date - 90" in conexao.sql
+    assert "limit 10" in conexao.sql
+
+
+async def test_resgate_usa_o_where_pronto_e_nao_o_filtro():
+    # O resgate precisa do " where " montado. Passar o fragmento do filter
+    # produziria '>= "col" >= data' e o proprio resgate viraria syntax error.
+    conexao = ConexaoContada(quebrar="sum(")
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
+    resgatado = next(s for s in conexao.selects if "filter" not in s)
+    assert resgatado == (
+        'select sum("valor_total") from "exemplo"."vendas"'
+        ' where "vendida_em" >= current_date - 30'
+    )
+
+
+async def test_indicador_sem_tempo_ignora_o_periodo():
+    conexao = ConexaoContada()
+    painel = [Indicador(id="com"), Indicador(id="sem", tempo=None)]
+    resultado = await calcular(conexao, "exemplo.vendas", painel, "30d")
+    assert resultado["sem"]["valor"] is not None
+    assert resultado["sem"]["anterior"] is None
+    assert resultado["sem"]["serie"] == []
+    # O sem tempo conta a tabela toda: o select dele nao tem filtro nenhum.
+    dele = next(
+        s for s in conexao.selects if s.count("sum(") == 1 and "filter" not in s
+    )
+    assert "where" not in dele

@@ -1,10 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import delete, func, select
 
 from ..auth import CurrentUser
-from ..calculo import calcular
+from ..calculo import JANELA_PADRAO, calcular, compor
 from ..db import Sessao
 from ..indicadores import (
     PAPEIS_ACEITOS,
@@ -14,12 +14,16 @@ from ..indicadores import (
     por_regra,
     sugerir_grafico,
 )
+from ..introspeccao import TEMPO, identificador
 from ..llm import sugerir_graficos
 from ..models import Campo as CampoDb
 from ..models import Indicador as IndicadorDb
 from ..models import SegmentoKpi as KpiDb
 from ..permissoes import exigir_dono, papel
 from ..schemas import (
+    JANELA,
+    Composicao,
+    Dimensao,
     Indicador,
     IndicadorCalculado,
     IndicadorEdicao,
@@ -32,6 +36,19 @@ from ..schemas import (
 from .comum import PREFIXO, buscar, campos, consultar
 
 router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
+
+
+# O que a pessoa pode escolher para quebrar o indicador. Nem chave nem data
+# entram: quebrar por id so rende um top-10 sem informacao, e a data e o eixo.
+def _dimensoes(catalogo: list[CampoDb], tempos: set) -> list[Dimensao]:
+    return [
+        Dimensao(coluna=c.coluna, rotulo=c.rotulo or c.coluna)
+        for c in catalogo
+        if c.papel == "dimensao"
+        and c.coluna not in tempos
+        and not identificador(c.coluna)
+        and not c.tipo.startswith(TEMPO)
+    ]
 
 
 def _conferir(dados, campos: list[CampoDb], agregacao: str) -> None:
@@ -311,7 +328,11 @@ async def sugerir_formas(
 # Abre o banco do cliente uma vez e calcula todos os indicadores nele.
 @router.get("/{conexao_id}/painel", response_model=Painel)
 async def painel(
-    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    user: CurrentUser,
+    sessao: Sessao,
+    janela: JANELA = JANELA_PADRAO,
 ):
     await papel(sessao, organizacao_id, user.id)
     conexao = await buscar(sessao, organizacao_id, conexao_id)
@@ -323,20 +344,95 @@ async def painel(
         )
     )
     saida = [IndicadorCalculado.model_validate(i) for i in linhas]
+    catalogo = await campos(sessao, conexao_id)
+    dimensoes = _dimensoes(catalogo, {i.tempo for i in linhas})
+    tempo = next((i.tempo for i in linhas if i.tempo), None)
+
     if not linhas or not conexao.tabela_fato:
-        return Painel(tabela=conexao.tabela_fato, indicadores=saida)
+        return Painel(
+            tabela=conexao.tabela_fato,
+            janela=janela,
+            indicadores=saida,
+            dimensoes=dimensoes,
+            janelavel=tempo is not None,
+        )
 
     tabela = conexao.tabela_fato
     try:
         valores = await consultar(
-            conexao, lambda externa: calcular(externa, tabela, linhas)
+            conexao,
+            lambda externa: calcular(externa, tabela, linhas, janela),
         )
     except HTTPException as e:
-        return Painel(tabela=tabela, indicadores=saida, erro=e.detail)
+        return Painel(
+            tabela=tabela,
+            janela=janela,
+            indicadores=saida,
+            dimensoes=dimensoes,
+            janelavel=tempo is not None,
+            erro=e.detail,
+        )
 
     for calculado in saida:
         dados = valores.get(str(calculado.id), {})
         calculado.valor = dados.get("valor")
-        calculado.linhas = [Quebra(**q) for q in dados.get("linhas", [])]
+        calculado.anterior = dados.get("anterior")
+        calculado.variacao = dados.get("variacao")
+        calculado.serie = [Quebra(**q) for q in dados.get("serie", [])]
         calculado.erro = dados.get("erro")
-    return Painel(tabela=tabela, indicadores=saida)
+    return Painel(
+        tabela=tabela,
+        janela=janela,
+        indicadores=saida,
+        dimensoes=dimensoes,
+        janelavel=tempo is not None,
+    )
+
+
+# A composicao e a pergunta "onde isso esta indo": um indicador, uma dimensao.
+@router.get("/{conexao_id}/composicao", response_model=Composicao)
+async def composicao(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    user: CurrentUser,
+    sessao: Sessao,
+    indicador: UUID,
+    dimensao: str = Query(min_length=1, max_length=200),
+    janela: JANELA = JANELA_PADRAO,
+    limite: int = Query(10, ge=1, le=30),
+):
+    await papel(sessao, organizacao_id, user.id)
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    if not conexao.tabela_fato:
+        raise HTTPException(409, "escolha a tabela fato antes")
+
+    alvo = await sessao.scalar(
+        select(IndicadorDb).where(
+            IndicadorDb.id == indicador, IndicadorDb.conexao_id == conexao_id
+        )
+    )
+    if alvo is None:
+        raise HTTPException(404, "indicador não encontrado")
+    if dimensao not in {c.coluna for c in await campos(sessao, conexao_id)}:
+        raise HTTPException(422, "essa coluna não existe no catálogo")
+
+    pontos = await consultar(
+        conexao,
+        lambda externa: compor(
+            externa, conexao.tabela_fato, alvo, dimensao, janela, limite
+        ),
+    )
+    rotulo = next(
+        (
+            c.rotulo or c.coluna
+            for c in await campos(sessao, conexao_id)
+            if c.coluna == dimensao
+        ),
+        dimensao,
+    )
+    return Composicao(
+        coluna=dimensao,
+        rotulo=rotulo,
+        total=sum(p["valor"] for p in pontos if p["valor"] is not None) or None,
+        pontos=[Quebra(**p) for p in pontos],
+    )

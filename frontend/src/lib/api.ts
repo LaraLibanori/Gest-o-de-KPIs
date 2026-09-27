@@ -2,7 +2,17 @@ import { createClient } from "./supabase/client";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+// A LLM tem fila de provedores e um teto de 20s por chamada, entao o prazo do
+// navegador precisa ser maior que isso. Sem essa folga, um provedor lento
+// levava a pagina a abortar a chamada e o recurso nunca aparecia.
+const PRAZO = 15000;
+const PRAZO_LLM = 60000;
+
+export async function api<T>(
+  path: string,
+  init?: RequestInit & { llm?: boolean },
+): Promise<T> {
+  const { llm, ...resto } = init ?? {};
   const supabase = createClient();
   const {
     data: { session },
@@ -13,12 +23,12 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
-      ...init,
-      signal: AbortSignal.timeout(15000),
+      ...resto,
+      signal: AbortSignal.timeout(llm ? PRAZO_LLM : PRAZO),
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${session.access_token}`,
-        ...init?.headers,
+        ...resto?.headers,
       },
     });
   } catch {
@@ -40,7 +50,9 @@ const GENERICO: Record<number, string> = {
 };
 
 async function mensagem(res: Response): Promise<string> {
-  if (res.status === 401 || res.status === 422) return GENERICO[res.status];
+  // 401 nao tem detalhe util, e 422 do FastAPI vem como lista de campo, entao
+  // so o texto simples do backend presta nesse caso.
+  if (res.status === 401) return GENERICO[401];
   const corpo = await res.json().catch(() => null);
   if (typeof corpo?.detail === "string") return corpo.detail;
   return GENERICO[res.status] ?? "não foi possível completar a ação";
@@ -127,6 +139,16 @@ export type Periodo =
   | "ultimos_30_dias"
   | "ultimos_90_dias"
   | "ano_atual";
+
+export type Janela = "7d" | "30d" | "90d" | "12m" | "tudo";
+
+export const JANELAS: { valor: Janela; rotulo: string }[] = [
+  { valor: "7d", rotulo: "7 dias" },
+  { valor: "30d", rotulo: "30 dias" },
+  { valor: "90d", rotulo: "90 dias" },
+  { valor: "12m", rotulo: "12 meses" },
+  { valor: "tudo", rotulo: "Tudo" },
+];
 
 export type Indicador = {
   id: string;
@@ -228,12 +250,26 @@ export type Quebra = { rotulo: string; valor: number | null };
 
 export type IndicadorCalculado = Indicador & {
   valor: number | null;
-  linhas: Quebra[];
+  anterior: number | null;
+  variacao: number | null;
+  serie: Quebra[];
   erro: string | null;
+};
+
+export type Dimensao = { coluna: string; rotulo: string };
+
+export type Composicao = {
+  coluna: string;
+  rotulo: string;
+  total: number | null;
+  pontos: Quebra[];
 };
 
 export type Painel = {
   tabela: string | null;
+  janela: Janela;
   indicadores: IndicadorCalculado[];
+  dimensoes: Dimensao[];
+  janelavel: boolean;
   erro: string | null;
 };

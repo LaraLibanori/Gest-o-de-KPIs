@@ -264,15 +264,37 @@ class Quebra(BaseModel):
     valor: float | None
 
 
+JANELA = Literal["7d", "30d", "90d", "12m", "tudo"]
+
+
 class IndicadorCalculado(Indicador):
     valor: float | None = None
-    linhas: list[Quebra] = []
+    anterior: float | None = None
+    variacao: float | None = None
+    serie: list[Quebra] = []
     erro: str | None = None
+
+
+class Dimensao(BaseModel):
+    coluna: str
+    rotulo: str
+
+
+class Composicao(BaseModel):
+    coluna: str
+    rotulo: str
+    total: float | None = None
+    pontos: list[Quebra] = []
 
 
 class Painel(BaseModel):
     tabela: str | None
+    janela: JANELA
     indicadores: list[IndicadorCalculado] = []
+    dimensoes: list[Dimensao] = []
+    # Falso quando a tabela fato nao tem coluna de data: ai o filtro de periodo
+    # nao teria efeito e a interface esconde o controle.
+    janelavel: bool = True
     erro: str | None = None
 
 

@@ -300,6 +300,7 @@ export default function Assistente({
       try {
         const r = await api<Sugestao>(`${base}/${id}/catalogo/rotulos`, {
           method: "POST",
+          llm: true,
         });
         if (r.aplicadas > 0) setCampos(r.campos);
       } catch {
@@ -381,6 +382,7 @@ export default function Assistente({
           `${base}/${id}/indicadores/graficos`,
           {
             method: "POST",
+            llm: true,
           },
         );
         if (r.aplicadas === 0) return;
