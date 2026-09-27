@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Literal
 
 import httpx
@@ -10,8 +11,11 @@ from pydantic import BaseModel, Field, ValidationError
 
 registro = logging.getLogger("kpi")
 
-# O terceiro campo diz se o provedor cobra: no OpenRouter so entra preco zero.
+# Ordem da fila: NVIDIA (gratis) primeiro, OpenRouter e Groq de reserva.
+# O ultimo campo filtra so preco zero: vale pro OpenRouter, que tem os dois.
+# A Groq lista o preco do plano pago, mas a conta free so leva rate limit.
 PROVEDORES = [
+    ("nvidia_nim", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY", True),
     ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", True),
     ("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY", False),
 ]
@@ -24,6 +28,34 @@ JANELA_MINIMA = 8192
 TEMPO_LIMITE = 20
 DESCANSO = 300
 TENTATIVAS = 3
+
+# Testado ao vivo: nunca respondeu, so ate estourar o tempo.
+TRAVA = {"deepseek-ai/deepseek-v4.1-flash"}
+
+# Nao fazem chat: embedding, guard, audio, imagem...
+NAO_CHAT = (
+    "embed",
+    "rerank",
+    "reward",
+    "guard",
+    "safety",
+    "whisper",
+    "asr",
+    "tts",
+    "audio",
+    "image",
+    "video",
+    "flux",
+    "ocr",
+    "vlm",
+    "vision",
+)
+
+# O 404 da NVIDIA nao conta tentativa, mas tem teto para nao prender a fila.
+TETO_404 = 10
+
+# Cache de 10 minutos: provedor que caiu numa chamada volta na proxima.
+TTL_MODELOS = 600
 
 # Erro de conta inteira: insistir nos outros modelos do mesmo provedor nao ajuda.
 CONTA_FORA = ("RateLimitError", "AuthenticationError", "PermissionDeniedError")
@@ -118,6 +150,7 @@ def _esquema_grafico(nomes: list[str]) -> type[BaseModel]:
 
 
 _modelos: list[str] | None = None
+_modelos_em = 0.0
 _roteador = None
 _tranca = asyncio.Lock()
 
@@ -138,6 +171,9 @@ def _gratuito(m: dict) -> bool:
 
 # Campo ausente nao reprova: nem todo provedor descreve os modelos igual.
 def _serve(m: dict, so_gratuito: bool) -> bool:
+    nome = m.get("id", "")
+    if nome in TRAVA or any(p in nome.lower() for p in NAO_CHAT):
+        return False
     if m.get("active") is False:
         return False
     if so_gratuito and not _gratuito(m):
@@ -162,12 +198,54 @@ async def _listar(cliente: httpx.AsyncClient, base: str, chave: str) -> list[dic
     return resposta.json().get("data", [])
 
 
+# A pagina free da NVIDIA marca os modelos com "Free Endpoint". Responde 202
+# quando desconfia de bot: ai desiste na hora e segue sem a lista.
+async def _gratuitos_nvidia(cliente: httpx.AsyncClient) -> set[str]:
+    try:
+        resposta = await cliente.get(
+            "https://build.nvidia.com/models",
+            params={"filters": "nimType:nim_type_preview", "pageSize": "96"},
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": "https://build.nvidia.com/",
+            },
+            timeout=5,
+        )
+        if resposta.status_code != 200:
+            return set()
+        html = resposta.text
+    except httpx.HTTPError:
+        return set()
+    cartoes = []
+    for marca in re.finditer(r"<a\s[^>]*>", html):
+        rotulo = re.search(r'data-nvtrack-nav-object-label="([^"]+)"', marca.group(0))
+        href = re.search(r'href="/([^"]+)"', marca.group(0))
+        if rotulo and href and "/" in href.group(1):
+            cartoes.append((href.group(1), marca.start()))
+    gratuitos = set()
+    for i, (nome, pos) in enumerate(cartoes):
+        # O selo vem antes do nome, dentro do mesmo cartao.
+        inicio = cartoes[i - 1][1] if i else 0
+        if "Free Endpoint" in html[inicio:pos]:
+            gratuitos.add(nome)
+    return gratuitos
+
+
 async def modelos() -> list[str]:
-    global _modelos
+    global _modelos, _modelos_em
     async with _tranca:
-        if _modelos is not None:
+        if _modelos is not None and time.monotonic() - _modelos_em < TTL_MODELOS:
             return _modelos
-        encontrados: list[tuple[int, float, str]] = []
+        # O litellm so conhece NVIDIA_NIM_API_KEY: espelha a nossa.
+        if os.environ.get("NVIDIA_API_KEY"):
+            os.environ.setdefault("NVIDIA_NIM_API_KEY", os.environ["NVIDIA_API_KEY"])
+        encontrados: list[tuple[int, int, float, str]] = []
+        gratuitos: set[str] = set()
         async with httpx.AsyncClient(timeout=10) as cliente:
             for ordem, (provedor, base, variavel, so_gratuito) in enumerate(PROVEDORES):
                 chave = os.environ.get(variavel)
@@ -178,31 +256,52 @@ async def modelos() -> list[str]:
                 except httpx.HTTPError:
                     registro.warning("não foi possível listar modelos de %s", provedor)
                     continue
+                if provedor == "nvidia_nim":
+                    gratuitos = await _gratuitos_nvidia(cliente)
                 for m in lista:
                     if not _serve(m, so_gratuito):
                         continue
                     nome = f"{provedor}/{m['id']}"
+                    livre = 0 if m["id"] in gratuitos else 1
                     porte = -1.0 if nome == SORTEIO else _porte(m["id"])
-                    encontrados.append((ordem, -porte, nome))
-        _modelos = [nome for _, _, nome in sorted(encontrados)]
+                    encontrados.append((ordem, livre, -porte, nome))
+        _modelos = [nome for _, _, _, nome in sorted(encontrados)]
+        _modelos_em = time.monotonic()
         return _modelos
 
 
 # O Router guarda quem falhou e deixa de molho pelo tempo do descanso.
+# Lista nova recria o roteador: provedor que voltou entra de volta.
 async def _montar(disponiveis: list[str]):
     global _roteador
-    if _roteador is None:
-        from litellm import Router
+    if _roteador is not None and {m["model_name"] for m in _roteador.model_list} == set(
+        disponiveis
+    ):
+        return _roteador
+    from litellm import Router
 
-        _roteador = Router(
-            model_list=[
-                {"model_name": m, "litellm_params": {"model": m}} for m in disponiveis
-            ],
-            cooldown_time=DESCANSO,
-            allowed_fails=1,
-            num_retries=0,
-        )
+    _roteador = Router(
+        model_list=[
+            {"model_name": m, "litellm_params": {"model": m}} for m in disponiveis
+        ],
+        cooldown_time=DESCANSO,
+        allowed_fails=1,
+        num_retries=0,
+    )
     return _roteador
+
+
+# Um de cada provedor por rodada: a reserva aparece ja na primeira falha.
+def _intercalar(nomes: list[str]) -> list[str]:
+    grupos: dict[str, list[str]] = {}
+    for nome in nomes:
+        grupos.setdefault(nome.split("/", 1)[0], []).append(nome)
+    fila = []
+    for i in range(max((len(g) for g in grupos.values()), default=0)):
+        for grupo in grupos.values():
+            if i < len(grupo):
+                fila.append(grupo[i])
+    return fila
 
 
 async def _perguntar(
@@ -221,8 +320,9 @@ async def _perguntar(
     roteador = await _montar(disponiveis)
     melhor: list = []
 
-    fila = list(disponiveis)
+    fila = _intercalar(disponiveis)
     tentativas = 0
+    sem_entidade = 0
     while fila and tentativas < TENTATIVAS:
         modelo = fila.pop(0)
         tentativas += 1
@@ -238,11 +338,22 @@ async def _perguntar(
             registro.warning("%s respondeu fora do formato", modelo)
             continue
         except Exception as e:  # noqa: BLE001 - sugestao nunca derruba o catalogo
+            provedor = modelo.split("/", 1)[0]
             if type(e).__name__ in CONTA_FORA:
-                provedor = modelo.split("/", 1)[0]
                 fila = [m for m in fila if not m.startswith(f"{provedor}/")]
                 tentativas -= 1
                 registro.warning("%s fora: pulando o provedor", provedor)
+            elif (
+                getattr(e, "status_code", None) == 404
+                or "Not found for account" in str(e)
+            ) and sem_entidade < TETO_404:
+                # Sem direito ao modelo: tenta o proximo do mesmo provedor.
+                sem_entidade += 1
+                tentativas -= 1
+                proximo = next((m for m in fila if m.startswith(f"{provedor}/")), None)
+                if proximo:
+                    fila.remove(proximo)
+                    fila.insert(0, proximo)
             else:
                 registro.warning("%s não respondeu", modelo)
             continue
