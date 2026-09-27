@@ -112,7 +112,10 @@ class Conexao(Base):
             "etapa in ('tabela', 'negocio', 'catalogo', 'indicadores', 'pronta')",
             name="conexoes_etapa_check",
         ),
-        sa.Index("conexoes_nome_unico", "organizacao_id", "nome", unique=True),
+        sa.Index(
+            "conexoes_nome_unico", "organizacao_id", sa.text("lower(nome)"), unique=True
+        ),
+        sa.Index("conexoes_esquema", "esquema"),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -125,6 +128,7 @@ class Conexao(Base):
     host: Mapped[str] = mapped_column(Text)
     porta: Mapped[int] = mapped_column(Integer)
     banco: Mapped[str] = mapped_column(Text)
+    esquema: Mapped[str | None] = mapped_column(Text, nullable=True)
     usuario: Mapped[str] = mapped_column(Text)
     senha_cifrada: Mapped[str] = mapped_column(Text)
     tabela_fato: Mapped[str | None] = mapped_column(Text, nullable=True)

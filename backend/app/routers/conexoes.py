@@ -2,19 +2,33 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 
 from ..auth import CurrentUser
 from ..cripto import cifrar
 from ..db import Sessao
-from ..introspeccao import listar_relacoes
+from ..introspeccao import listar_esquemas, listar_relacoes
 from ..models import Conexao as ConexaoDb
 from ..models import Indicador as IndicadorDb
 from ..permissoes import exigir_dono, papel
-from ..schemas import Conexao, ConexaoEtapa, ConexaoIn, Verificacao
+from ..schemas import Conexao, ConexaoIn, ConexaoPatch, ConexaoProva, Verificacao
 from .comum import PREFIXO, buscar, consultar
 
 router = APIRouter(prefix=PREFIXO, tags=["conexões"])
+
+DUPLICADO = "esta organização já tem uma conexão chamada {nome}"
+
+# Colunas que aceitam ficar sem valor. Nas outras, mandar vazio é erro e não
+# "limpa": a validação entrega None, e escrever None em coluna NOT NULL só daria
+# um 500 sem dizer o que aconteceu.
+LIMPAVEIS = {
+    "esquema",
+    "tabela_fato",
+    "tabela_tipo",
+    "descricao_negocio",
+    "segmento",
+}
 
 
 @router.get("", response_model=list[Conexao])
@@ -33,14 +47,7 @@ async def criar(
     organizacao_id: UUID, body: ConexaoIn, user: CurrentUser, sessao: Sessao
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "criar conexão")
-
-    repetido = await sessao.scalar(
-        select(ConexaoDb.id).where(
-            ConexaoDb.organizacao_id == organizacao_id, ConexaoDb.nome == body.nome
-        )
-    )
-    if repetido:
-        raise HTTPException(409, "já existe uma conexão com esse nome")
+    await _garantir_nome_livre(sessao, organizacao_id, body.nome)
 
     nova = ConexaoDb(
         organizacao_id=organizacao_id,
@@ -48,6 +55,7 @@ async def criar(
         host=body.host,
         porta=body.porta,
         banco=body.banco,
+        esquema=body.esquema,
         usuario=body.usuario,
         senha_cifrada=cifrar(body.senha),
         tabela_fato=body.tabela_fato,
@@ -55,52 +63,139 @@ async def criar(
         criada_por=user.id,
     )
     sessao.add(nova)
-    await sessao.flush()
+    try:
+        await sessao.flush()
+    except IntegrityError:
+        await sessao.rollback()
+        raise HTTPException(409, DUPLICADO.format(nome=body.nome)) from None
     await sessao.refresh(nova)
     resposta = Conexao.model_validate(nova)
     await sessao.commit()
     return resposta
 
 
-@router.post("/{conexao_id}/verificar", response_model=Verificacao)
-async def verificar(
-    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
-):
-    await papel(sessao, organizacao_id, user.id)
-    conexao = await buscar(sessao, organizacao_id, conexao_id)
+async def _garantir_nome_livre(
+    sessao: Sessao, organizacao_id: UUID, nome: str, ignorar: UUID | None = None
+) -> None:
+    filtros = [
+        ConexaoDb.organizacao_id == organizacao_id,
+        func.lower(ConexaoDb.nome) == nome.lower(),
+    ]
+    if ignorar is not None:
+        filtros.append(ConexaoDb.id != ignorar)
+    if await sessao.scalar(select(ConexaoDb.id).where(*filtros)):
+        raise HTTPException(409, DUPLICADO.format(nome=nome))
 
+
+async def _inspecionar(conexao: ConexaoDb, esquema: str | None) -> Verificacao:
     relacoes: list[dict] = []
+    esquemas: list[str] = []
     erro: str | None = None
+
+    async def _ler(externa):
+        relacoes.extend(await listar_relacoes(externa, esquema))
+        esquemas.extend(await listar_esquemas(externa))
+
     try:
-        relacoes = await consultar(conexao, listar_relacoes)
+        await consultar(conexao, _ler)
     except HTTPException as e:
         erro = e.detail
 
+    return Verificacao(ok=erro is None, erro=erro, relacoes=relacoes, esquemas=esquemas)
+
+
+@router.post("/provar", response_model=Verificacao)
+async def provar(
+    organizacao_id: UUID, body: ConexaoProva, user: CurrentUser, sessao: Sessao
+):
+    """Testa a credencial digitada sem criar nada.
+
+    Existe para a pessoa descobrir que a senha esta errada antes de preencher o
+    resto, e para o botao "Testar" nao deixar rascunho para tras.
+    """
+    await exigir_dono(sessao, organizacao_id, user.id, "testar conexão")
+    provisoria = ConexaoDb(
+        organizacao_id=organizacao_id,
+        nome="prova",
+        host=body.host,
+        porta=body.porta,
+        banco=body.banco,
+        esquema=body.esquema,
+        usuario=body.usuario,
+        senha_cifrada=cifrar(body.senha),
+        etapa="tabela",
+        criada_por=user.id,
+    )
+    return await _inspecionar(provisoria, body.esquema)
+
+
+@router.post("/{conexao_id}/verificar", response_model=Verificacao)
+async def verificar(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    user: CurrentUser,
+    sessao: Sessao,
+    esquema: str | None = None,
+):
+    await papel(sessao, organizacao_id, user.id)
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    alvo = (esquema or "").strip() or conexao.esquema
+
+    resultado = await _inspecionar(conexao, alvo)
     conexao.verificada_em = datetime.now(timezone.utc)
-    conexao.verificacao_erro = erro
+    conexao.verificacao_erro = resultado.erro
     await sessao.commit()
-    return Verificacao(ok=erro is None, erro=erro, relacoes=relacoes)
+    return resultado
 
 
 @router.patch("/{conexao_id}", response_model=Conexao)
 async def avancar(
     organizacao_id: UUID,
     conexao_id: UUID,
-    body: ConexaoEtapa,
+    body: ConexaoPatch,
     user: CurrentUser,
     sessao: Sessao,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "editar conexão")
     conexao = await buscar(sessao, organizacao_id, conexao_id)
+
+    mudancas: dict[str, object] = {}
+    for campo in body.model_fields_set:
+        if campo == "senha":
+            if body.senha:
+                mudancas["senha_cifrada"] = cifrar(body.senha)
+            continue
+        valor = getattr(body, campo)
+        if valor is None and campo not in LIMPAVEIS:
+            raise HTTPException(422, f"{campo} não pode ficar vazio")
+        mudancas[campo] = valor
+
+    if "nome" in mudancas and mudancas["nome"] != conexao.nome:
+        await _garantir_nome_livre(
+            sessao, organizacao_id, str(mudancas["nome"]), ignorar=conexao_id
+        )
+
     if body.etapa == "pronta":
         tem = await sessao.scalar(
             select(IndicadorDb.id).where(IndicadorDb.conexao_id == conexao_id).limit(1)
         )
         if not tem:
             raise HTTPException(409, "defina ao menos um indicador antes de concluir")
-    for campo, valor in body.model_dump(exclude_none=True).items():
+
+    for campo, valor in mudancas.items():
         setattr(conexao, campo, valor)
-    await sessao.flush()
+
+    if body.credenciais or body.senha:
+        conexao.verificada_em = None
+        conexao.verificacao_erro = None
+
+    try:
+        await sessao.flush()
+    except IntegrityError:
+        await sessao.rollback()
+        raise HTTPException(
+            409, DUPLICADO.format(nome=mudancas.get("nome") or conexao.nome)
+        ) from None
     await sessao.refresh(conexao)
     resposta = Conexao.model_validate(conexao)
     await sessao.commit()

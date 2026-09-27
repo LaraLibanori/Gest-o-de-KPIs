@@ -34,7 +34,7 @@ VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY NVIDIA_API_KEY OPENROUTER_
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a
 
 .PHONY: ajuda env-init instalar dev dev-front dev-back checar checar-front checar-back \
-	env env-front env-back migrar migracao migracoes exemplo testes lint preview producao testar portas limpar
+	env env-front env-back migrar migracao migracoes exemplo moda testes lint preview producao testar portas limpar
 
 ajuda:
 	@echo "make env-init   cria os .env a partir dos exemplos"
@@ -46,6 +46,7 @@ ajuda:
 	@echo "make migracao m=\"texto\"   cria uma migration a partir do models.py"
 	@echo "make migracoes  mostra a migration atual e o historico"
 	@echo "make exemplo    cria a base de exemplo, no papel de banco do cliente"
+	@echo "make moda       cria a base de uma loja de moda, tambem no papel do cliente"
 	@echo "make env        manda as variaveis dos .env para a Vercel"
 	@echo "make preview    publica um preview e testa as rotas"
 	@echo "make producao   publica em producao e testa as rotas"
@@ -112,6 +113,13 @@ exemplo:
 	psql "$$MIGRATIONS_DATABASE_URL" -q -v ON_ERROR_STOP=1 \
 	  -v senha="$$DEMO_LEITOR_PASSWORD" -f supabase/exemplo.sql
 	@echo "base de exemplo criada em exemplo.vendas"
+
+moda:
+	$(call CARREGAR,$(ENV_BACK)); \
+	[ -n "$${DEMO_LEITOR_PASSWORD:-}" ] || { echo "falta DEMO_LEITOR_PASSWORD em $(ENV_BACK)"; exit 1; }; \
+	psql "$$MIGRATIONS_DATABASE_URL" -q -v ON_ERROR_STOP=1 \
+	  -v senha="$$DEMO_LEITOR_PASSWORD" -f supabase/moda.sql
+	@echo "base de moda criada em moda.vendas"
 
 # Precisa de um Postgres vazio na 55432, veja o README.
 testes:

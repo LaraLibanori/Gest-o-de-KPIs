@@ -77,6 +77,7 @@ export type Conexao = {
   host: string;
   porta: number;
   banco: string;
+  esquema: string | null;
   usuario: string;
   tabela_fato: string | null;
   tabela_tipo: string | null;
@@ -97,6 +98,7 @@ export type Verificacao = {
   ok: boolean;
   erro: string | null;
   relacoes: Relacao[];
+  esquemas: string[];
 };
 
 export type PapelCampo = "metrica" | "dimensao" | "tempo" | "ignorar";

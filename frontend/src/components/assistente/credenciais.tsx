@@ -1,6 +1,8 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { CircleCheck, Loader2, Plug, TriangleAlert } from "lucide-react";
+import type { Conexao } from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
@@ -16,6 +18,7 @@ export type Credenciais = {
   host: string;
   porta: string;
   banco: string;
+  esquema: string;
   usuario: string;
   senha: string;
 };
@@ -25,20 +28,45 @@ export const VAZIO: Credenciais = {
   host: "",
   porta: "5432",
   banco: "",
+  esquema: "",
   usuario: "",
   senha: "",
 };
+
+export function de(conexao: Conexao): Credenciais {
+  return {
+    nome: conexao.nome,
+    host: conexao.host,
+    porta: String(conexao.porta),
+    banco: conexao.banco,
+    esquema: conexao.esquema ?? "",
+    usuario: conexao.usuario,
+    senha: "",
+  };
+}
+
+export type Aviso = { tipo: "erro" | "okto"; titulo: string; texto: string };
 
 export default function PassoCredenciais({
   form,
   setForm,
   ocupado,
+  testando,
+  aviso,
+  editando,
+  podeTestar,
+  onTestar,
   onEnviar,
   onCancelar,
 }: {
   form: Credenciais;
   setForm: (f: Credenciais) => void;
   ocupado: boolean;
+  testando: boolean;
+  aviso: Aviso | null;
+  editando: boolean;
+  podeTestar: boolean;
+  onTestar: () => void;
   onEnviar: (e: React.FormEvent) => void;
   onCancelar: () => void;
 }) {
@@ -79,16 +107,34 @@ export default function PassoCredenciais({
             />
           </Field>
         </div>
-        <Field>
-          <FieldLabel htmlFor="banco">Banco</FieldLabel>
-          <Input
-            id="banco"
-            placeholder="postgres"
-            value={form.banco}
-            onChange={(e) => setForm({ ...form, banco: e.target.value })}
-            required
-          />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="banco">Banco</FieldLabel>
+            <Input
+              id="banco"
+              placeholder="postgres"
+              value={form.banco}
+              onChange={(e) => setForm({ ...form, banco: e.target.value })}
+              required
+            />
+            <FieldDescription>
+              O servidor a que você se conecta. No Supabase é sempre{" "}
+              <span className="font-mono">postgres</span>.
+            </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="esquema">Schema</FieldLabel>
+            <Input
+              id="esquema"
+              placeholder="deixe vazio para ver todos"
+              value={form.esquema}
+              onChange={(e) => setForm({ ...form, esquema: e.target.value })}
+            />
+            <FieldDescription>
+              Onde as tabelas moram dentro do banco. Não é o banco.
+            </FieldDescription>
+          </Field>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="usuario">Usuário</FieldLabel>
@@ -106,9 +152,10 @@ export default function PassoCredenciais({
               id="senha"
               type="password"
               autoComplete="new-password"
+              placeholder={editando ? "deixe vazio para manter" : undefined}
               value={form.senha}
               onChange={(e) => setForm({ ...form, senha: e.target.value })}
-              required
+              required={!editando}
             />
           </Field>
         </div>
@@ -116,13 +163,41 @@ export default function PassoCredenciais({
           Um usuário só de leitura basta, e é mais seguro.
         </FieldDescription>
       </FieldGroup>
+      {aviso && (
+        <Alert
+          variant={aviso.tipo === "erro" ? "destructive" : "default"}
+          className="mb-2"
+        >
+          {aviso.tipo === "erro" ? <TriangleAlert /> : <CircleCheck />}
+          <AlertTitle>{aviso.titulo}</AlertTitle>
+          <AlertDescription>{aviso.texto}</AlertDescription>
+        </Alert>
+      )}
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onCancelar}>
-          Cancelar
+          {editando ? "Fechar" : "Cancelar"}
         </Button>
-        <Button type="submit" disabled={ocupado}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onTestar}
+          disabled={ocupado || testando || !podeTestar}
+          title={
+            podeTestar
+              ? undefined
+              : "a senha guardada não volta para a tela; digite-a para testar"
+          }
+        >
+          {testando ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            <Plug />
+          )}
+          Testar conexão
+        </Button>
+        <Button type="submit" disabled={ocupado || testando}>
           {ocupado && <Loader2 className="animate-spin" />}
-          Conectar
+          {editando ? "Salvar e reconectar" : "Conectar"}
         </Button>
       </DialogFooter>
     </form>

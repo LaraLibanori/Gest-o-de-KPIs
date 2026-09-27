@@ -8,6 +8,7 @@ import {
   Database,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   Table2,
@@ -78,7 +79,8 @@ export default function Conexoes() {
   const [assistente, setAssistente] = useState<{
     ativo: boolean;
     alvo: Conexao | null;
-  }>({ ativo: false, alvo: null });
+    editar: boolean;
+  }>({ ativo: false, alvo: null, editar: false });
   const [verificando, setVerificando] = useState<string | null>(null);
   const [apagando, setApagando] = useState<Conexao | null>(null);
 
@@ -139,9 +141,12 @@ export default function Conexoes() {
   }
 
   function fecharAssistente(mudou: boolean) {
-    setAssistente({ ativo: false, alvo: null });
+    setAssistente({ ativo: false, alvo: null, editar: false });
     if (mudou && aberta) carregar(aberta.id);
   }
+
+  const abrir = (alvo: Conexao | null, editar = false) =>
+    setAssistente({ ativo: true, alvo, editar });
 
   const ocupado = carregandoOrg || carregando;
 
@@ -155,7 +160,7 @@ export default function Conexoes() {
           </p>
         </div>
         {souDono && conexoes.length > 0 && (
-          <Button onClick={() => setAssistente({ ativo: true, alvo: null })}>
+          <Button onClick={() => abrir(null)}>
             <Plus />
             Nova conexão
           </Button>
@@ -204,9 +209,7 @@ export default function Conexoes() {
           </EmptyHeader>
           <EmptyContent>
             {souDono ? (
-              <Button
-                onClick={() => setAssistente({ ativo: true, alvo: null })}
-              >
+              <Button onClick={() => abrir(null)}>
                 <Plus />
                 Adicionar conexão
               </Button>
@@ -225,6 +228,7 @@ export default function Conexoes() {
                 <CardTitle className="truncate">{c.nome}</CardTitle>
                 <CardDescription className="font-mono text-xs break-all">
                   {c.usuario}@{c.host}:{c.porta}/{c.banco}
+                  {c.esquema ? ` · ${c.esquema}` : ""}
                 </CardDescription>
               </CardHeader>
 
@@ -246,10 +250,7 @@ export default function Conexoes() {
                 </span>
                 <div className="flex items-center gap-1">
                   {souDono && c.etapa !== "pronta" ? (
-                    <Button
-                      size="sm"
-                      onClick={() => setAssistente({ ativo: true, alvo: c })}
-                    >
+                    <Button size="sm" onClick={() => abrir(c)}>
                       Continuar
                     </Button>
                   ) : (
@@ -286,11 +287,11 @@ export default function Conexoes() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            setAssistente({ ativo: true, alvo: c })
-                          }
-                        >
+                        <DropdownMenuItem onSelect={() => abrir(c, true)}>
+                          <Pencil />
+                          Editar conexão
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => abrir(c)}>
                           <Table2 />
                           Revisar campos
                         </DropdownMenuItem>
@@ -316,6 +317,7 @@ export default function Conexoes() {
           organizacaoId={aberta.id}
           conexao={assistente.alvo}
           aberto={assistente.ativo}
+          editar={assistente.editar}
           onFechar={fecharAssistente}
         />
       )}

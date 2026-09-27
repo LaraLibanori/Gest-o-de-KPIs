@@ -63,6 +63,7 @@ class ConexaoIn(BaseModel):
     host: str = Field(min_length=1, max_length=255)
     porta: int = Field(default=5432, ge=1, le=65535)
     banco: str = Field(min_length=1, max_length=120)
+    esquema: str | None = Field(default=None, max_length=63)
     usuario: str = Field(min_length=1, max_length=120)
     senha: str = Field(min_length=1, max_length=255)
     tabela_fato: str | None = Field(default=None, max_length=120)
@@ -75,6 +76,35 @@ class ConexaoIn(BaseModel):
             raise ValueError("campo obrigatório")
         return v
 
+    @field_validator("esquema")
+    @classmethod
+    def esquema_ou_nada(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
+
+class ConexaoProva(BaseModel):
+    host: str = Field(min_length=1, max_length=255)
+    porta: int = Field(default=5432, ge=1, le=65535)
+    banco: str = Field(min_length=1, max_length=120)
+    esquema: str | None = Field(default=None, max_length=63)
+    usuario: str = Field(min_length=1, max_length=120)
+    senha: str = Field(min_length=1, max_length=255)
+
+    @field_validator("host", "banco", "usuario")
+    @classmethod
+    def sem_espaco(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("campo obrigatório")
+        return v
+
+    @field_validator("esquema")
+    @classmethod
+    def esquema_ou_nada(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
 
 # A senha nunca sai daqui.
 class Conexao(BaseModel):
@@ -85,6 +115,7 @@ class Conexao(BaseModel):
     host: str
     porta: int
     banco: str
+    esquema: str | None
     usuario: str
     tabela_fato: str | None
     tabela_tipo: str | None
@@ -105,9 +136,17 @@ class Verificacao(BaseModel):
     ok: bool
     erro: str | None = None
     relacoes: list[Relacao] = []
+    esquemas: list[str] = []
 
 
-class ConexaoEtapa(BaseModel):
+class ConexaoPatch(BaseModel):
+    nome: str | None = Field(default=None, max_length=120)
+    host: str | None = Field(default=None, max_length=255)
+    porta: int | None = Field(default=None, ge=1, le=65535)
+    banco: str | None = Field(default=None, max_length=120)
+    esquema: str | None = Field(default=None, max_length=63)
+    usuario: str | None = Field(default=None, max_length=120)
+    senha: str | None = Field(default=None, max_length=255)
     tabela_fato: str | None = Field(default=None, max_length=200)
     tabela_tipo: str | None = Field(default=None, max_length=40)
     descricao_negocio: str | None = Field(default=None, max_length=500)
@@ -115,6 +154,23 @@ class ConexaoEtapa(BaseModel):
     etapa: Literal["tabela", "negocio", "catalogo", "indicadores", "pronta"] | None = (
         None
     )
+
+    @field_validator("nome", "host", "banco", "usuario")
+    @classmethod
+    def sem_espaco(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
+    @field_validator("esquema")
+    @classmethod
+    def esquema_ou_nada(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
+    @property
+    def credenciais(self) -> dict:
+        campos = ("host", "porta", "banco", "esquema", "usuario")
+        return {c: getattr(self, c) for c in campos if c in self.model_fields_set}
 
 
 class Campo(BaseModel):

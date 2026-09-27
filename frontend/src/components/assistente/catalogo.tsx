@@ -25,6 +25,7 @@ export default function PassoCatalogo({
   tabela,
   ocupado,
   sugerindo,
+  rotuloCancelar,
   onMudarPapel,
   onFechar,
   onAvancar,
@@ -33,6 +34,7 @@ export default function PassoCatalogo({
   tabela: string | null;
   ocupado: boolean;
   sugerindo: boolean;
+  rotuloCancelar: string;
   onMudarPapel: (campo: Campo, papel: PapelCampo) => void;
   onFechar: () => void;
   onAvancar: () => void;
@@ -102,7 +104,7 @@ export default function PassoCatalogo({
       </div>
       <DialogFooter>
         <Button variant="ghost" onClick={onFechar}>
-          Continuar depois
+          {rotuloCancelar}
         </Button>
         <Button onClick={onAvancar} disabled={ocupado || campos.length === 0}>
           Montar indicadores

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { falhar } from "@/lib/erros";
+import { falhar, textoDe } from "@/lib/erros";
 import {
   api,
   type Campo,
@@ -18,6 +18,7 @@ import {
   type Sugestao,
   type Verificacao,
 } from "@/lib/api";
+import Confirmar from "@/components/confirmar";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PassoCatalogo from "@/components/assistente/catalogo";
-import PassoCredenciais, { VAZIO } from "@/components/assistente/credenciais";
+import PassoCredenciais, {
+  de as credenciaisDe,
+  VAZIO,
+  type Aviso,
+} from "@/components/assistente/credenciais";
 import PassoIndicadores from "@/components/assistente/indicadores";
 import PassoNegocio from "@/components/assistente/negocio";
 import PassoTabela from "@/components/assistente/tabela";
@@ -67,17 +72,21 @@ export default function Assistente({
   organizacaoId,
   conexao,
   aberto,
+  editar,
   onFechar,
 }: {
   organizacaoId: string;
   conexao: Conexao | null;
   aberto: boolean;
+  editar: boolean;
   onFechar: (mudou: boolean) => void;
 }) {
   const [etapa, setEtapa] = useState<Etapa>("credenciais");
   const [atual, setAtual] = useState<Conexao | null>(null);
   const [form, setForm] = useState(VAZIO);
   const [relacoes, setRelacoes] = useState<Relacao[]>([]);
+  const [esquemas, setEsquemas] = useState<string[]>([]);
+  const [esquema, setEsquema] = useState<string | null>(null);
   const [negocio, setNegocio] = useState("");
   const [segmento, setSegmento] = useState("");
   const [segmentos, setSegmentos] = useState<Segmento[]>([]);
@@ -87,19 +96,36 @@ export default function Assistente({
   const [ocupado, setOcupado] = useState(false);
   const [sugerindo, setSugerindo] = useState(false);
   const [mudou, setMudou] = useState(false);
+  const [criada, setCriada] = useState(false);
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [testando, setTestando] = useState(false);
+  const [descartando, setDescartando] = useState(false);
+  const descartandoAgora = useRef(false);
 
   const base = `/organizacoes/${organizacaoId}/conexoes`;
 
   const buscarRelacoes = useCallback(
-    async (id: string) => {
-      const r = await api<Verificacao>(`${base}/${id}/verificar`, {
+    async (id: string, alvo?: string | null) => {
+      const busca = alvo ? `?esquema=${encodeURIComponent(alvo)}` : "";
+      const r = await api<Verificacao>(`${base}/${id}/verificar${busca}`, {
         method: "POST",
       });
       if (!r.ok) throw new Error(r.erro ?? "o banco não respondeu");
       setRelacoes(r.relacoes);
+      setEsquemas(r.esquemas);
     },
     [base],
   );
+
+  async function descartar(id: string): Promise<boolean> {
+    try {
+      await api<void>(`${base}/${id}`, { method: "DELETE" });
+      return true;
+    } catch {
+      toast.error("não foi possível apagar o rascunho, a conexão continua salva");
+      return false;
+    }
+  }
 
   useEffect(() => {
     if (!aberto) return;
@@ -108,15 +134,24 @@ export default function Assistente({
       .catch(() => {});
   }, [aberto]);
 
+  const abertoAntes = useRef(false);
   useEffect(() => {
-    if (!aberto) return;
+    const abriu = aberto && !abertoAntes.current;
+    abertoAntes.current = aberto;
+    if (!abriu) return;
     setMudou(false);
+    setCriada(false);
+    setAviso(null);
+    setTestando(false);
+    setDescartando(false);
     setDescartados([]);
     if (!conexao) {
       setEtapa("credenciais");
       setAtual(null);
       setForm(VAZIO);
       setRelacoes([]);
+      setEsquemas([]);
+      setEsquema(null);
       setNegocio("");
       setSegmento("");
       setCampos([]);
@@ -124,6 +159,12 @@ export default function Assistente({
       return;
     }
     setAtual(conexao);
+    setEsquema(conexao.esquema ?? null);
+    setForm(credenciaisDe(conexao));
+    if (editar) {
+      setEtapa("credenciais");
+      return;
+    }
     setNegocio(conexao.descricao_negocio ?? "");
     setSegmento(conexao.segmento ?? "");
     const retomar = conexao.etapa === "pronta" ? "indicadores" : conexao.etapa;
@@ -146,23 +187,86 @@ export default function Assistente({
         setOcupado(false);
       }
     })();
-  }, [aberto, conexao, base, buscarRelacoes]);
+  }, [aberto, conexao, base, buscarRelacoes, editar]);
+
+  async function testar() {
+    if (testando || ocupado) return;
+    if (atual && !form.senha) return;
+    setTestando(true);
+    setAviso(null);
+    try {
+      const r = await api<Verificacao>(`${base}/provar`, {
+        method: "POST",
+        body: JSON.stringify({ ...form, porta: Number(form.porta) }),
+      });
+      if (!r.ok) {
+        setAviso({
+          tipo: "erro",
+          titulo: "Não foi possível conectar",
+          texto: r.erro ?? "o banco não respondeu",
+        });
+        return;
+      }
+      setEsquemas(r.esquemas);
+      setAviso({
+        tipo: "okto",
+        titulo: "Conexão funciona",
+        texto: `${r.relacoes.length} tabela${r.relacoes.length === 1 ? "" : "s"} em ${r.esquemas.length} schema${r.esquemas.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      setAviso({
+        tipo: "erro",
+        titulo: "Não foi possível testar",
+        texto: textoDe(err, "não foi possível conectar ao banco"),
+      });
+    } finally {
+      setTestando(false);
+    }
+  }
+
+  async function trocarEsquema(alvo: string | null) {
+    if (!atual || ocupado) return;
+    setEsquema(alvo);
+    setOcupado(true);
+    try {
+      await buscarRelacoes(atual.id, alvo);
+    } catch (err) {
+      falhar(err);
+    } finally {
+      setOcupado(false);
+    }
+  }
 
   async function salvarCredenciais(e: React.FormEvent) {
     e.preventDefault();
     if (ocupado) return;
+    setAviso(null);
     setOcupado(true);
+    const corpo = {
+      ...form,
+      porta: Number(form.porta),
+      esquema: form.esquema.trim() || null,
+    };
+    let nova: Conexao | null = null;
     try {
-      const nova = await api<Conexao>(base, {
-        method: "POST",
-        body: JSON.stringify({ ...form, porta: Number(form.porta) }),
+      const edicao = atual !== null;
+      nova = await api<Conexao>(edicao ? `${base}/${atual!.id}` : base, {
+        method: edicao ? "PATCH" : "POST",
+        body: JSON.stringify(corpo),
       });
+      await buscarRelacoes(nova.id, nova.esquema);
+      setCriada(!edicao);
       setAtual(nova);
+      setForm(credenciaisDe(nova));
       setMudou(true);
-      await buscarRelacoes(nova.id);
       setEtapa("tabela");
     } catch (err) {
-      falhar(err);
+      if (!atual && nova) await descartar(nova.id);
+      setAviso({
+        tipo: "erro",
+        titulo: "Não foi possível conectar",
+        texto: textoDe(err, "não foi possível conectar ao banco"),
+      });
     } finally {
       setOcupado(false);
     }
@@ -374,96 +478,144 @@ export default function Assistente({
     }
   }
 
+  function pedirFechar() {
+    if (!criada) {
+      onFechar(mudou);
+      return;
+    }
+    setDescartando(true);
+  }
+
+  async function sairDescartando() {
+    if (descartandoAgora.current) return;
+    descartandoAgora.current = true;
+    setOcupado(true);
+    const ok = !atual || (await descartar(atual.id));
+    setOcupado(false);
+    descartandoAgora.current = false;
+    if (!ok) return;
+    setDescartando(false);
+    onFechar(true);
+  }
+
   const indice = Math.max(
     0,
     ETAPAS.findIndex((e) => e.id === etapa),
   );
   const passo = ETAPAS[indice];
+  const rotuloCancelar = criada ? "Cancelar" : "Fechar";
 
   return (
-    <Dialog open={aberto} onOpenChange={(o) => !o && onFechar(mudou)}>
-      <DialogContent
-        className={LARGAS.includes(etapa) ? "sm:max-w-2xl" : "sm:max-w-lg"}
-        showCloseButton={false}
-      >
-        <DialogHeader>
-          <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs">
-            {ETAPAS.map((e, i) => (
-              <span
-                key={e.id}
-                className={
-                  "h-1 flex-1 rounded-full " +
-                  (i <= indice ? "bg-primary" : "bg-muted")
-                }
-              />
-            ))}
-          </div>
-          <DialogTitle>{passo.titulo}</DialogTitle>
-          <DialogDescription>
-            Etapa {indice + 1} de {ETAPAS.length} · {passo.descricao}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={aberto} onOpenChange={(o) => !o && pedirFechar()}>
+        <DialogContent
+          className={LARGAS.includes(etapa) ? "sm:max-w-2xl" : "sm:max-w-lg"}
+          showCloseButton={false}
+        >
+          <DialogHeader>
+            <div
+              className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs"
+            >
+              {ETAPAS.map((e, i) => (
+                <span
+                  key={e.id}
+                  className={
+                    "h-1 flex-1 rounded-full " +
+                    (i <= indice ? "bg-primary" : "bg-muted")
+                  }
+                />
+              ))}
+            </div>
+            <DialogTitle>{passo.titulo}</DialogTitle>
+            <DialogDescription>
+              Etapa {indice + 1} de {ETAPAS.length} · {passo.descricao}
+            </DialogDescription>
+          </DialogHeader>
 
-        {etapa === "credenciais" && (
-          <PassoCredenciais
-            form={form}
-            setForm={setForm}
-            ocupado={ocupado}
-            onEnviar={salvarCredenciais}
-            onCancelar={() => onFechar(mudou)}
-          />
-        )}
+          {etapa === "credenciais" && (
+            <PassoCredenciais
+              form={form}
+              setForm={setForm}
+              ocupado={ocupado}
+              testando={testando}
+              aviso={aviso}
+              editando={atual !== null}
+              podeTestar={!atual || form.senha.trim().length > 0}
+              onTestar={testar}
+              onEnviar={salvarCredenciais}
+              onCancelar={pedirFechar}
+            />
+          )}
 
-        {etapa === "tabela" && (
-          <PassoTabela
-            relacoes={relacoes}
-            escolhida={atual?.tabela_fato ?? null}
-            ocupado={ocupado}
-            onEscolher={escolherTabela}
-            onFechar={() => onFechar(mudou)}
-          />
-        )}
+          {etapa === "tabela" && (
+            <PassoTabela
+              relacoes={relacoes}
+              esquemas={esquemas}
+              esquema={esquema}
+              escolhida={atual?.tabela_fato ?? null}
+              ocupado={ocupado}
+              rotuloCancelar={rotuloCancelar}
+              onEscolher={escolherTabela}
+              onEsquema={trocarEsquema}
+              onFechar={pedirFechar}
+            />
+          )}
 
-        {etapa === "negocio" && (
-          <PassoNegocio
-            negocio={negocio}
-            setNegocio={setNegocio}
-            segmento={segmento}
-            setSegmento={setSegmento}
-            segmentos={segmentos}
-            ocupado={ocupado}
-            onEnviar={salvarNegocio}
-            onVoltar={() => setEtapa("tabela")}
-          />
-        )}
+          {etapa === "negocio" && (
+            <PassoNegocio
+              negocio={negocio}
+              setNegocio={setNegocio}
+              segmento={segmento}
+              setSegmento={setSegmento}
+              segmentos={segmentos}
+              ocupado={ocupado}
+              rotuloCancelar={rotuloCancelar}
+              onEnviar={salvarNegocio}
+              onVoltar={() => setEtapa("tabela")}
+              onCancelar={pedirFechar}
+            />
+          )}
 
-        {etapa === "catalogo" && (
-          <PassoCatalogo
-            campos={campos}
-            tabela={atual?.tabela_fato ?? null}
-            ocupado={ocupado}
-            sugerindo={sugerindo}
-            onMudarPapel={mudarPapel}
-            onFechar={() => onFechar(mudou)}
-            onAvancar={montarIndicadores}
-          />
-        )}
+          {etapa === "catalogo" && (
+            <PassoCatalogo
+              campos={campos}
+              tabela={atual?.tabela_fato ?? null}
+              ocupado={ocupado}
+              sugerindo={sugerindo}
+              rotuloCancelar={rotuloCancelar}
+              onMudarPapel={mudarPapel}
+              onFechar={pedirFechar}
+              onAvancar={montarIndicadores}
+            />
+          )}
 
-        {etapa === "indicadores" && (
-          <PassoIndicadores
-            indicadores={indicadores}
-            campos={campos}
-            descartados={descartados}
-            ocupado={ocupado}
-            onTrocarColuna={trocarColuna}
-            onTrocarGrafico={trocarGrafico}
-            onRemover={removerIndicador}
-            onCriar={criarIndicador}
-            onFechar={() => onFechar(mudou)}
-            onConcluir={concluir}
-          />
-        )}
+          {etapa === "indicadores" && (
+            <PassoIndicadores
+              indicadores={indicadores}
+              campos={campos}
+              descartados={descartados}
+              ocupado={ocupado}
+              rotuloCancelar={rotuloCancelar}
+              onTrocarColuna={trocarColuna}
+              onTrocarGrafico={trocarGrafico}
+              onRemover={removerIndicador}
+              onCriar={criarIndicador}
+              onFechar={pedirFechar}
+              onConcluir={concluir}
+            />
+          )}
       </DialogContent>
     </Dialog>
+
+      <Confirmar
+        aberto={descartando}
+        titulo="Descartar esta conexão?"
+        descricao={`A conexão ${atual?.nome ?? ""} e o que foi configurado até agora serão apagados. O banco da empresa não é alterado.`}
+        acao="Descartar"
+        fecharAoConfirmar={false}
+        onConfirmar={sairDescartando}
+        onFechar={() => setDescartando(false)}
+      />
+    </>
   );
 }

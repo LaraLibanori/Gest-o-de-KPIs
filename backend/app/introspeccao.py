@@ -27,7 +27,24 @@ RELACOES = """
         select 1 from pg_depend d
         where d.objid = c.oid and d.deptype = 'e'
       )
+      and ($1::text is null or n.nspname = $1)
     order by n.nspname, c.relname
+"""
+
+ESQUEMAS = """
+    select n.nspname as esquema
+    from pg_namespace n
+    where has_schema_privilege(n.oid, 'usage')
+      and n.nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
+      and n.nspname not like 'pg_%'
+      and exists (
+        select 1
+          from pg_class c
+         where c.relnamespace = n.oid
+           and c.relkind in ('r', 'p', 'v', 'm')
+           and has_table_privilege(c.oid, 'select')
+      )
+    order by n.nspname
 """
 
 COLUNAS = """
@@ -63,8 +80,10 @@ def partir(referencia: str) -> tuple[str, str]:
     return (esquema, nome) if nome else ("public", esquema)
 
 
-async def listar_relacoes(conexao: asyncpg.Connection) -> list[dict]:
-    linhas = await conexao.fetch(RELACOES)
+async def listar_relacoes(
+    conexao: asyncpg.Connection, esquema: str | None = None
+) -> list[dict]:
+    linhas = await conexao.fetch(RELACOES, esquema)
     return [
         {
             "nome": r["nome"]
@@ -74,6 +93,10 @@ async def listar_relacoes(conexao: asyncpg.Connection) -> list[dict]:
         }
         for r in linhas
     ]
+
+
+async def listar_esquemas(conexao: asyncpg.Connection) -> list[str]:
+    return [r["esquema"] for r in await conexao.fetch(ESQUEMAS)]
 
 
 async def _cardinalidades(
@@ -104,7 +127,7 @@ async def _cardinalidades(
 
 
 def identificador(coluna: str) -> bool:
-    return coluna == "id" or coluna.endswith("_id")
+    return coluna == "id" or coluna.startswith("id_") or coluna.endswith("_id")
 
 
 def classificar(

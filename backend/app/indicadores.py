@@ -1,3 +1,4 @@
+from .introspeccao import identificador
 from .texto import normalizar, palavras
 
 QUANTOS = 5
@@ -49,7 +50,7 @@ def _texto(campo) -> str:
 
 # Chave que nomeia alguma coisa serve para contar; a chave da propria linha nao.
 def _entidade(campo) -> bool:
-    return campo.coluna != "id" and campo.coluna.endswith("_id")
+    return campo.coluna != "id" and identificador(campo.coluna)
 
 
 def _somavel(campo) -> bool:

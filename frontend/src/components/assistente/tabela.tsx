@@ -1,29 +1,72 @@
 "use client";
 
-import { Check, Database, Sheet, Table2 } from "lucide-react";
+import { Check, Database, Layers, Sheet, Table2 } from "lucide-react";
 import type { Relacao } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ICONE = { tabela: Table2, view: Sheet, "view materializada": Database };
 
+const TODOS = "\0todos";
+
 export default function PassoTabela({
   relacoes,
+  esquemas,
+  esquema,
   escolhida,
   ocupado,
+  rotuloCancelar,
   onEscolher,
+  onEsquema,
   onFechar,
 }: {
   relacoes: Relacao[];
+  esquemas: string[];
+  esquema: string | null;
   escolhida: string | null;
   ocupado: boolean;
+  rotuloCancelar: string;
   onEscolher: (r: Relacao) => void;
+  onEsquema: (esquema: string | null) => void;
   onFechar: () => void;
 }) {
   return (
     <>
+      {esquemas.length > 1 && (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+            <Layers className="size-4" />
+            Schema
+          </span>
+          <Select
+            value={esquema ?? TODOS}
+            onValueChange={(v) => onEsquema(v === TODOS ? null : v)}
+            disabled={ocupado}
+          >
+            <SelectTrigger className="w-full font-mono" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {esquemas.map((e) => (
+                <SelectItem key={e} value={e} className="font-mono">
+                  {e}
+                </SelectItem>
+              ))}
+              <SelectItem value={TODOS}>Todos os schemas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="my-4 max-h-80 space-y-1 overflow-y-auto">
         {ocupado ? (
           [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)
@@ -58,7 +101,7 @@ export default function PassoTabela({
       </p>
       <DialogFooter>
         <Button variant="ghost" onClick={onFechar}>
-          Continuar depois
+          {rotuloCancelar}
         </Button>
       </DialogFooter>
     </>

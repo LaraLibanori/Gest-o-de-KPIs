@@ -26,8 +26,10 @@ export default function PassoNegocio({
   setSegmento,
   segmentos,
   ocupado,
+  rotuloCancelar,
   onEnviar,
   onVoltar,
+  onCancelar,
 }: {
   negocio: string;
   setNegocio: (v: string) => void;
@@ -35,8 +37,10 @@ export default function PassoNegocio({
   setSegmento: (v: string) => void;
   segmentos: Segmento[];
   ocupado: boolean;
+  rotuloCancelar: string;
   onEnviar: (e: React.FormEvent) => void;
   onVoltar: () => void;
+  onCancelar: () => void;
 }) {
   return (
     <form onSubmit={onEnviar}>
@@ -78,6 +82,9 @@ export default function PassoNegocio({
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onVoltar}>
           Voltar
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancelar}>
+          {rotuloCancelar}
         </Button>
         <Button type="submit" disabled={ocupado}>
           {ocupado && <Loader2 className="animate-spin" />}

@@ -196,6 +196,7 @@ export default function PassoIndicadores({
   onTrocarGrafico,
   onRemover,
   onCriar,
+  rotuloCancelar,
   onFechar,
   onConcluir,
 }: {
@@ -207,6 +208,7 @@ export default function PassoIndicadores({
   onTrocarGrafico: (indicador: Indicador, grafico: Grafico) => void;
   onRemover: (indicador: Indicador) => void;
   onCriar: (novo: IndicadorNovo) => Promise<void>;
+  rotuloCancelar: string;
   onFechar: () => void;
   onConcluir: () => void;
 }) {
@@ -333,7 +335,7 @@ export default function PassoIndicadores({
 
       <DialogFooter>
         <Button variant="ghost" onClick={onFechar}>
-          Continuar depois
+          {rotuloCancelar}
         </Button>
         <Button
           onClick={onConcluir}
