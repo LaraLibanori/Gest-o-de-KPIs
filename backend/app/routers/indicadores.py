@@ -333,6 +333,7 @@ async def painel(
     user: CurrentUser,
     sessao: Sessao,
     janela: JANELA = JANELA_PADRAO,
+    serie: bool = True,
 ):
     await papel(sessao, organizacao_id, user.id)
     conexao = await buscar(sessao, organizacao_id, conexao_id)
@@ -361,7 +362,7 @@ async def painel(
     try:
         valores = await consultar(
             conexao,
-            lambda externa: calcular(externa, tabela, linhas, janela),
+            lambda externa: calcular(externa, tabela, linhas, janela, com_serie=serie),
         )
     except HTTPException as e:
         return Painel(

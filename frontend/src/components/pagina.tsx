@@ -11,8 +11,6 @@ const LARGURAS = {
 
 export type Largura = keyof typeof LARGURAS;
 
-// A margem e o ritmo vertical vivem aqui, e nao em cada pagina: mudar a classe
-// uma vez move o produto inteiro. Quem so quiser outra largura troca o parametro.
 export function Pagina({
   largura = "normal",
   children,

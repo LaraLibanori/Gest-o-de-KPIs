@@ -8,7 +8,6 @@ import Sparkline from "@/components/painel/sparkline";
 import { cn } from "@/lib/utils";
 
 function Delta({ valor }: { valor: number | null }) {
-  // Variação zero não é alta: pintar de verde com seta para cima mente.
   if (valor === null || !Number.isFinite(valor)) {
     return (
       <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">

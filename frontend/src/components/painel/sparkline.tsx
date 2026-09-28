@@ -2,8 +2,6 @@
 
 import type { Quebra } from "@/lib/api";
 
-// Sparkline e contexto, nao leitura: o numero vive no tile e o desenho aqui
-// serve para o olho pegar a direcao antes mesmo de ler.
 export default function Sparkline({
   pontos,
   className = "h-10 w-full",

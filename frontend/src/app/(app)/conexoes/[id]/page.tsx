@@ -31,7 +31,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizacao } from "../../contexto";
 
 const JANELA_INICIAL: Janela = "30d";
-// Media, minimo e maximo sao nivel: nao faz sentido empilhar barra em zero.
 const SEM_ZERO = new Set(["media", "minimo", "maximo"]);
 const SOMAVEIS = new Set(["soma", "contagem", "distintos"]);
 
@@ -50,10 +49,10 @@ export default function PainelDaConexao() {
   });
   const [selecionado, setSelecionado] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [carregandoSerie, setCarregandoSerie] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  // Duas trocas rapidas de periodo saem em ordem arbitraria; sem isto a tela
-  // pode mostrar "12 meses" com os numeros de "7 dias".
   const pedido = useRef(0);
+  const pintou = useRef(false);
 
   const base = aberta ? `/organizacoes/${aberta.id}/conexoes` : null;
 
@@ -71,24 +70,43 @@ export default function PainelDaConexao() {
       if (!base) return;
       const meu = ++pedido.current;
       setCarregando(true);
+      setCarregandoSerie(false);
+      pintou.current = false;
       try {
-        // O catalogo e o nome da conexao nao mudam com o periodo: traz uma vez so.
-        const [lista, catalogo, dados] = await Promise.all([
+        const [lista, catalogo, rapido] = await Promise.all([
           api<Conexao[]>(base),
           api<Campo[]>(`${base}/${id}/catalogo`),
-          api<Painel>(`${base}/${id}/painel?janela=${alvo}`),
+          api<Painel>(`${base}/${id}/painel?janela=${alvo}&serie=0`),
         ]);
         if (meu !== pedido.current) return;
         setConexao(lista.find((c) => c.id === id) ?? null);
         setCampos(catalogo);
-        setPainel(dados);
+        setPainel(rapido);
         setErro(null);
+        pintou.current = true;
+        setCarregando(false);
+        setCarregandoSerie(true);
+
+        const completo = await api<Painel>(`${base}/${id}/painel?janela=${alvo}`);
+        if (meu !== pedido.current) return;
+        setPainel(completo);
       } catch (e) {
         if (meu !== pedido.current) return;
-        setErro(e instanceof Error ? e.message : "não foi possível carregar");
-        falhar(e, "não foi possível carregar o painel");
+        if (pintou.current) {
+          setErro(
+            e instanceof Error
+              ? `os números estão acima, mas a série falhou: ${e.message}`
+              : "os números estão acima, mas a série falhou",
+          );
+        } else {
+          setErro(e instanceof Error ? e.message : "não foi possível carregar");
+          falhar(e, "não foi possível carregar o painel");
+        }
       } finally {
-        if (meu === pedido.current) setCarregando(false);
+        if (meu === pedido.current) {
+          setCarregando(false);
+          setCarregandoSerie(false);
+        }
       }
     },
     [base, id],
@@ -96,7 +114,6 @@ export default function PainelDaConexao() {
 
   useEffect(() => {
     if (!carregandoOrg) buscar(janela);
-    // Trocar de periodo e a unica coisa que recarrega; o resto fica.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregandoOrg, buscar]);
 
@@ -227,6 +244,7 @@ export default function PainelDaConexao() {
                     SOMAVEIS.has(destaque.agregacao) ? destaque.valor : null
                   }
                   zero={!SEM_ZERO.has(destaque.agregacao)}
+                  carregando={carregandoSerie}
                 />
                 <p className="text-muted-foreground mt-2 text-xs">
                   Passe o mouse ou use as setas do teclado para ver o valor de cada

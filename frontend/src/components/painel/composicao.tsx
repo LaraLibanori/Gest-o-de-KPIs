@@ -33,12 +33,14 @@ export default function Composicao({
   const [dados, setDados] = useState<Composicao | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<string | null>(null);
 
   useEffect(() => {
     if (!coluna || indicador.id === undefined) return;
     let vivo = true;
     setCarregando(true);
     setErro(null);
+    setAberto(null);
     api<Composicao>(
       `${base}/composicao?indicador=${indicador.id}&dimensao=${encodeURIComponent(coluna)}&janela=${janela}`,
     )
@@ -107,25 +109,54 @@ export default function Composicao({
             const valor = p.valor as number;
             const fatia = maior > 0 ? (valor / maior) * 100 : 0;
             const doTotal = total > 0 ? (valor / total) * 100 : 0;
+            const escolhido = aberto === p.rotulo;
             return (
-              <li
-                key={p.rotulo}
-                className="group relative grid grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-accent/50"
-                title={`${p.rotulo}: ${cheio(valor)} (${doTotal.toFixed(1).replace(".", ",")}%)`}
-              >
-                <span className="truncate text-sm">{p.rotulo}</span>
-                <span className="bg-muted h-2 overflow-hidden rounded-full">
-                  <span
-                    className="bg-chart-1 block h-full rounded-full transition-[width] duration-500"
-                    style={{ width: `${fatia}%` }}
-                  />
-                </span>
-                <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
-                  {curto(valor)}
-                  <span className="ml-1 opacity-70">
-                    {doTotal.toFixed(0)}%
+              <li key={p.rotulo}>
+                <button
+                  type="button"
+                  aria-expanded={escolhido}
+                  onClick={() => setAberto(escolhido ? null : p.rotulo)}
+                  className={cn(
+                    "grid w-full grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-3 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/50",
+                    escolhido && "bg-accent/60",
+                  )}
+                >
+                  <span className="truncate text-sm">{p.rotulo}</span>
+                  <span className="bg-muted h-2 overflow-hidden rounded-full">
+                    <span
+                      className="bg-chart-1 block h-full rounded-full transition-[width] duration-500"
+                      style={{ width: `${fatia}%` }}
+                    />
                   </span>
-                </span>
+                  <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
+                    {curto(valor)}
+                    <span className="ml-1 opacity-70">
+                      {doTotal.toFixed(0)}%
+                    </span>
+                  </span>
+                </button>
+                {escolhido && (
+                  <dl className="text-muted-foreground animate-in fade-in grid grid-cols-3 gap-2 px-1 pt-1.5 pb-1 text-xs">
+                    <div>
+                      <dt>Valor</dt>
+                      <dd className="text-foreground tabular-nums">
+                        {cheio(valor)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Do total</dt>
+                      <dd className="text-foreground tabular-nums">
+                        {doTotal.toFixed(1).replace(".", ",")}%
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Da maior</dt>
+                      <dd className="text-foreground tabular-nums">
+                        {fatia.toFixed(1).replace(".", ",")}%
+                      </dd>
+                    </div>
+                  </dl>
+                )}
               </li>
             );
           })}

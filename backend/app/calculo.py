@@ -148,7 +148,11 @@ async def _serie(conexao, de: str, onde: str, coluna: str, balde: str, conta: st
 
 
 async def calcular(
-    conexao: asyncpg.Connection, tabela: str, indicadores, janela: str | None = None
+    conexao: asyncpg.Connection,
+    tabela: str,
+    indicadores,
+    janela: str | None = None,
+    com_serie: bool = True,
 ) -> dict:
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     prazo = time.monotonic() + ORCAMENTO
@@ -167,9 +171,6 @@ async def calcular(
     if not validos:
         return resultados
 
-    # So quem tem coluna de data entra no filtro de periodo. indicator sem tempo
-    # conta a tabela inteira, e nao o recorte de outro indicador: caso contrario
-    # o numero dele mudaria junto com a janela sem ninguem pedir.
     com_tempo = [i for i in validos if i.tempo]
     sem_tempo = [i for i in validos if not i.tempo]
     tempo = com_tempo[0].tempo if com_tempo else None
@@ -190,6 +191,14 @@ async def calcular(
     if sem_tempo:
         resultados.update(await _valores(conexao, de, "", "", sem_tempo))
 
+    for indicador in sem_tempo:
+        resultados[str(indicador.id)]["serie"] = []
+
+    if not com_serie:
+        for indicador in com_tempo:
+            resultados[str(indicador.id)]["serie"] = []
+        return resultados
+
     for indicador in com_tempo:
         dados = resultados[str(indicador.id)]
         if "erro" in dados or time.monotonic() > prazo:
@@ -202,8 +211,6 @@ async def calcular(
         except Exception:  # noqa: BLE001 - sem serie o numero ainda serve
             registro.exception("falha na serie de %s", indicador.nome)
             dados["serie"] = []
-    for indicador in sem_tempo:
-        resultados[str(indicador.id)]["serie"] = []
     return resultados
 
 

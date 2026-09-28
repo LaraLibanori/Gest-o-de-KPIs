@@ -11,9 +11,6 @@ const MARGEM = { topo: 16, direita: 16, base: 28, esquerda: 52 };
 const INTERNO_L = L - MARGEM.esquerda - MARGEM.direita;
 const INTERNO_A = A - MARGEM.topo - MARGEM.base;
 
-// Soma, contagem e distintos sao quantidades absolutas: comecar em zero e o que
-// nao deixa a linha parecer maior do que e. Media, minimo e maximo sao um
-// nivel, e zero so achata a leitura.
 function escala(valores: number[], zero: boolean) {
   const maior = Math.max(...valores);
   const menor = zero ? Math.min(0, ...valores) : Math.min(...valores);
@@ -39,17 +36,17 @@ export default function Evolucao({
   rotulo,
   total,
   zero = true,
+  carregando = false,
 }: {
   pontos: Quebra[];
   rotulo: string;
   total: number | null;
   zero?: boolean;
+  carregando?: boolean;
 }) {
   const [ativo, setAtivo] = useState<number | null>(null);
   const caixa = useRef<HTMLDivElement>(null);
 
-  // n e a posicao depois do filtro: o indice original pula com os nulos e
-  // empurra os pontos seguintes para fora do grafico.
   const validos = useMemo(
     () => pontos.filter((p) => p.valor !== null).map((p, n) => ({ ...p, n })),
     [pontos],
@@ -82,8 +79,6 @@ export default function Evolucao({
     return `${traco} L${x(ultimo.n)},${y(base)} L${x(primeiro.n)},${y(base)} Z`;
   }, [validos, traco, x, y, base]);
 
-  // O ponteiro vira indice pelo mais proximo, e nao por proporcao do pixel: o
-  // eixo temporal nao e uniforme quando o balde muda de granularidade.
   const mover = useCallback(
     (clientX: number) => {
       const caixa_ = caixa.current?.getBoundingClientRect();
@@ -120,7 +115,9 @@ export default function Evolucao({
   );
 
   if (validos.length < 2)
-    return (
+    return carregando ? (
+      <div className="bg-muted/40 h-60 w-full animate-pulse rounded-sm" />
+    ) : (
       <div className="text-muted-foreground flex h-60 items-center justify-center text-sm">
         Sem série temporal para desenhar
       </div>
@@ -132,9 +129,21 @@ export default function Evolucao({
     ponto && anterior !== null && anterior !== 0
       ? (((ponto.valor as number) - anterior) / Math.abs(anterior)) * 100
       : null;
+  const anuncio =
+    ponto &&
+    `${rotuloDe(ponto.rotulo)}: ${cheio(ponto.valor as number)}${
+      mudanca !== null
+        ? `, ${mudanca >= 0 ? "alta" : "queda"} de ${Math.abs(mudanca)
+            .toFixed(1)
+            .replace(".", ",")}%`
+        : ""
+    }`;
 
   return (
     <div ref={caixa} className="relative">
+      <span className="sr-only" aria-live="polite">
+        {anuncio}
+      </span>
       <svg
         viewBox={`0 0 ${L} ${A}`}
         className="h-60 w-full touch-none focus-visible:ring-ring/50 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
@@ -268,7 +277,6 @@ export default function Evolucao({
   );
 }
 
-// 2026-09-01 vira 01/set, que cabe no eixo e ainda diz o mes.
 function rotuloDe(iso: string | undefined): string {
   if (!iso) return "";
   const data = new Date(`${iso}T00:00:00`);
