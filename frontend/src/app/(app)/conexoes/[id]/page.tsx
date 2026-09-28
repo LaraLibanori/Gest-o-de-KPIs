@@ -119,7 +119,7 @@ export default function PainelDaConexao() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregandoOrg, buscar]);
 
-  const todos = painel?.indicadores ?? [];
+  const todos = useMemo(() => painel?.indicadores ?? [], [painel]);
   const indicadores = useMemo(
     () => todos.filter((i) => i.erro === null && i.valor !== null),
     [todos],
