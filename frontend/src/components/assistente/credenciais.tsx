@@ -188,11 +188,7 @@ export default function PassoCredenciais({
               : "a senha guardada não volta para a tela; digite-a para testar"
           }
         >
-          {testando ? (
-            <Loader2 className="animate-spin" />
-          ) : (
-            <Plug />
-          )}
+          {testando ? <Loader2 className="animate-spin" /> : <Plug />}
           Testar conexão
         </Button>
         <Button type="submit" disabled={ocupado || testando}>

@@ -15,7 +15,8 @@ export default function Sparkline({
   if (valores.length < 2) return <div className={className} aria-hidden />;
 
   const menor = Math.min(...valores);
-  const faixa = Math.max(...valores) - menor || Math.abs(Math.max(...valores)) || 1;
+  const faixa =
+    Math.max(...valores) - menor || Math.abs(Math.max(...valores)) || 1;
   const ultimo = valores[valores.length - 1];
   const primeiro = valores[0];
   const subiu = ultimo >= primeiro;

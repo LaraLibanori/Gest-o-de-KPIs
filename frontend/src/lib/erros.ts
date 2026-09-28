@@ -1,6 +1,9 @@
 import { toast } from "sonner";
 
-export function textoDe(erro: unknown, padrao = "não foi possível concluir"): string {
+export function textoDe(
+  erro: unknown,
+  padrao = "não foi possível concluir",
+): string {
   return erro instanceof Error ? erro.message : padrao;
 }
 

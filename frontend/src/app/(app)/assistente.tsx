@@ -122,7 +122,9 @@ export default function Assistente({
       await api<void>(`${base}/${id}`, { method: "DELETE" });
       return true;
     } catch {
-      toast.error("não foi possível apagar o rascunho, a conexão continua salva");
+      toast.error(
+        "não foi possível apagar o rascunho, a conexão continua salva",
+      );
       return false;
     }
   }
@@ -515,9 +517,7 @@ export default function Assistente({
           showCloseButton={false}
         >
           <DialogHeader>
-            <div
-              className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs"
-            >
+            <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs">
               {ETAPAS.map((e, i) => (
                 <span
                   key={e.id}
@@ -606,8 +606,8 @@ export default function Assistente({
               onConcluir={concluir}
             />
           )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
 
       <Confirmar
         aberto={descartando}

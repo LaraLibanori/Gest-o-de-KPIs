@@ -1,6 +1,11 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, Minus, TriangleAlert } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Minus,
+  TriangleAlert,
+} from "lucide-react";
 import { FRASES, type IndicadorCalculado } from "@/lib/api";
 import { cheio, curto } from "@/lib/numero";
 import { humano, variacao } from "@/lib/rotulo";
@@ -68,7 +73,9 @@ export default function Tile({
     >
       <div className="flex items-start justify-between gap-2">
         <p className="truncate text-sm font-medium">{indicador.nome}</p>
-        {selecionado && <span className="bg-primary size-1.5 shrink-0 rounded-full" />}
+        {selecionado && (
+          <span className="bg-primary size-1.5 shrink-0 rounded-full" />
+        )}
       </div>
 
       {indicador.erro ? (
@@ -80,7 +87,9 @@ export default function Tile({
         <div className="flex flex-col gap-1">
           <p
             className="text-3xl leading-none font-semibold tabular-nums"
-            title={indicador.valor === null ? undefined : cheio(indicador.valor)}
+            title={
+              indicador.valor === null ? undefined : cheio(indicador.valor)
+            }
           >
             {indicador.valor === null ? "—" : curto(indicador.valor)}
           </p>
@@ -96,7 +105,10 @@ export default function Tile({
       )}
 
       {!indicador.erro && indicador.serie.length > 1 && (
-        <Sparkline pontos={indicador.serie} className="-mx-1 h-9 w-[calc(100%+0.5rem)]" />
+        <Sparkline
+          pontos={indicador.serie}
+          className="-mx-1 h-9 w-[calc(100%+0.5rem)]"
+        />
       )}
 
       <p

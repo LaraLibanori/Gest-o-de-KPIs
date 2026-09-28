@@ -14,7 +14,8 @@ const INTERNO_A = A - MARGEM.topo - MARGEM.base;
 function escala(valores: number[], zero: boolean) {
   const maior = Math.max(...valores);
   const menor = zero ? Math.min(0, ...valores) : Math.min(...valores);
-  const bruto = Math.max(...valores) - Math.min(0, ...valores) || Math.abs(maior) || 1;
+  const bruto =
+    Math.max(...valores) - Math.min(0, ...valores) || Math.abs(maior) || 1;
   const folga = bruto * 0.12;
   const topo = maior + (maior > 0 ? folga : 0);
   const piso = zero
@@ -53,14 +54,20 @@ export default function Evolucao({
   );
 
   const { y, tiques, base } = useMemo(
-    () => escala(validos.map((p) => p.valor as number), zero),
+    () =>
+      escala(
+        validos.map((p) => p.valor as number),
+        zero,
+      ),
     [validos, zero],
   );
 
   const x = useCallback(
     (n: number) =>
       MARGEM.esquerda +
-      (validos.length < 2 ? INTERNO_L / 2 : (n / (validos.length - 1)) * INTERNO_L),
+      (validos.length < 2
+        ? INTERNO_L / 2
+        : (n / (validos.length - 1)) * INTERNO_L),
     [validos.length],
   );
 
@@ -124,7 +131,8 @@ export default function Evolucao({
     );
 
   const ponto = ativo === null ? null : validos[ativo];
-  const anterior = ativo !== null && ativo > 0 ? validos[ativo - 1].valor : null;
+  const anterior =
+    ativo !== null && ativo > 0 ? validos[ativo - 1].valor : null;
   const mudanca =
     ponto && anterior !== null && anterior !== 0
       ? (((ponto.valor as number) - anterior) / Math.abs(anterior)) * 100
@@ -158,8 +166,16 @@ export default function Evolucao({
       >
         <defs>
           <linearGradient id="preenche" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.34} />
-            <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
+            <stop
+              offset="0%"
+              stopColor="var(--color-chart-1)"
+              stopOpacity={0.34}
+            />
+            <stop
+              offset="100%"
+              stopColor="var(--color-chart-1)"
+              stopOpacity={0.02}
+            />
           </linearGradient>
         </defs>
 

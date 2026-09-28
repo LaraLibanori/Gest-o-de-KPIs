@@ -87,7 +87,9 @@ export default function PainelDaConexao() {
         setCarregando(false);
         setCarregandoSerie(true);
 
-        const completo = await api<Painel>(`${base}/${id}/painel?janela=${alvo}`);
+        const completo = await api<Painel>(
+          `${base}/${id}/painel?janela=${alvo}`,
+        );
         if (meu !== pedido.current) return;
         setPainel(completo);
       } catch (e) {
@@ -130,9 +132,13 @@ export default function PainelDaConexao() {
   }, [indicadores, selecionado]);
 
   const rotuloJanela =
-    { "7d": "7 dias", "30d": "30 dias", "90d": "90 dias", "12m": "12 meses", tudo: "" }[
-      janela
-    ] ?? "";
+    {
+      "7d": "7 dias",
+      "30d": "30 dias",
+      "90d": "90 dias",
+      "12m": "12 meses",
+      tudo: "",
+    }[janela] ?? "";
 
   return (
     <Pagina largura="largo">
@@ -199,19 +205,20 @@ export default function PainelDaConexao() {
             <EmptyTitle>Nenhum indicador ainda</EmptyTitle>
             <EmptyDescription>
               Volte para as conexões e use{" "}
-              <span className="text-foreground">Revisar campos</span> para montar
-              os indicadores desta conexão.
+              <span className="text-foreground">Revisar campos</span> para
+              montar os indicadores desta conexão.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <>
-          {comFalha.length === indicadores.length && indicadores.length === 0 && (
-            <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-              Nenhum dos {todos.length} indicadores deste painel pôde ser
-              calculado. O erro de cada um está no cartão acima.
-            </p>
-          )}
+          {comFalha.length === indicadores.length &&
+            indicadores.length === 0 && (
+              <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                Nenhum dos {todos.length} indicadores deste painel pôde ser
+                calculado. O erro de cada um está no cartão acima.
+              </p>
+            )}
 
           <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {todos.map((i) => (
@@ -247,8 +254,8 @@ export default function PainelDaConexao() {
                   carregando={carregandoSerie}
                 />
                 <p className="text-muted-foreground mt-2 text-xs">
-                  Passe o mouse ou use as setas do teclado para ver o valor de cada
-                  período.
+                  Passe o mouse ou use as setas do teclado para ver o valor de
+                  cada período.
                 </p>
               </section>
 

@@ -21,9 +21,11 @@ type Modo = "entrar" | "criar";
 
 // As mensagens do Supabase vêm em inglês e cruas demais para a tela.
 function traduzir(codigo: string | undefined, mensagem: string): string {
-  if (codigo === "user_already_exists") return "Já existe uma conta com esse e-mail.";
+  if (codigo === "user_already_exists")
+    return "Já existe uma conta com esse e-mail.";
   if (codigo === "invalid_credentials") return "E-mail ou senha incorretos.";
-  if (codigo === "weak_password") return "A senha precisa de pelo menos 6 caracteres.";
+  if (codigo === "weak_password")
+    return "A senha precisa de pelo menos 6 caracteres.";
   if (codigo === "over_request_rate_limit")
     return "Muitas tentativas seguidas. Espere um pouco.";
   return mensagem || "Não foi possível concluir. Tente de novo.";

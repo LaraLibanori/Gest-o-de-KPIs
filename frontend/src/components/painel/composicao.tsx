@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { api, type Composicao, type Dimensao, type IndicadorCalculado } from "@/lib/api";
+import {
+  api,
+  type Composicao,
+  type Dimensao,
+  type IndicadorCalculado,
+} from "@/lib/api";
 import { cheio, curto } from "@/lib/numero";
 import { cn } from "@/lib/utils";
 import {

@@ -46,7 +46,12 @@ export function Cabecalho({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
+    <div
+      className={cn(
+        "flex flex-wrap items-start justify-between gap-4",
+        className,
+      )}
+    >
       <div className="min-w-0">
         {voltar && (
           <Link
@@ -56,7 +61,9 @@ export function Cabecalho({
             {voltar.rotulo}
           </Link>
         )}
-        <h1 className="truncate text-2xl font-semibold tracking-tight">{titulo}</h1>
+        <h1 className="truncate text-2xl font-semibold tracking-tight">
+          {titulo}
+        </h1>
         {descricao && (
           <p className="text-muted-foreground mt-1 text-sm">{descricao}</p>
         )}
