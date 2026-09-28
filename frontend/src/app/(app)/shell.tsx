@@ -187,7 +187,7 @@ export default function Shell({
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className="gap-1">
                   {NAVEGACAO.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
