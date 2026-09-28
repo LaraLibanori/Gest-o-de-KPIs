@@ -21,6 +21,7 @@ import { useOrganizacao } from "./contexto";
 import Assistente from "./assistente";
 import { Badge } from "@/components/ui/badge";
 import Confirmar from "@/components/confirmar";
+import { Cabecalho, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -151,21 +152,19 @@ export default function Conexoes() {
   const ocupado = carregandoOrg || carregando;
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 md:p-8">
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Conexões</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Os bancos PostgreSQL de onde os indicadores são calculados.
-          </p>
-        </div>
-        {souDono && conexoes.length > 0 && (
-          <Button onClick={() => abrir(null)}>
-            <Plus />
-            Nova conexão
-          </Button>
-        )}
-      </div>
+    <Pagina>
+      <Cabecalho
+        titulo="Conexões"
+        descricao="Os bancos PostgreSQL de onde os indicadores são calculados."
+        acoes={
+          souDono && conexoes.length > 0 ? (
+            <Button onClick={() => abrir(null)}>
+              <Plus />
+              Nova conexão
+            </Button>
+          ) : null
+        }
+      />
 
       {ocupado ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -195,7 +194,7 @@ export default function Conexoes() {
           </EmptyHeader>
         </Empty>
       ) : conexoes.length === 0 ? (
-        <Empty className="border-dashed py-16">
+        <Empty className="border-dashed py-10">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <Database />
@@ -329,6 +328,6 @@ export default function Conexoes() {
         onConfirmar={apagar}
         onFechar={() => setApagando(null)}
       />
-    </div>
+    </Pagina>
   );
 }

@@ -5,6 +5,7 @@ import { Building2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { falhar } from "@/lib/erros";
 import { api } from "@/lib/api";
+import { Cabecalho, Pagina } from "@/components/pagina";
 import { useOrganizacao } from "../contexto";
 import Pessoas from "../pessoas";
 import { Badge } from "@/components/ui/badge";
@@ -59,13 +60,11 @@ export default function Configuracoes() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-4 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Quem participa desta organização e o que fazer com ela.
-        </p>
-      </div>
+    <Pagina largura="estreito">
+      <Cabecalho
+        titulo="Configurações"
+        descricao="Quem participa desta organização e o que fazer com ela."
+      />
 
       {carregando ? (
         <Skeleton className="h-64 w-full" />
@@ -147,6 +146,6 @@ export default function Configuracoes() {
         onConfirmar={apagar}
         onFechar={() => setApagando(false)}
       />
-    </div>
+    </Pagina>
   );
 }
