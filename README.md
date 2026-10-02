@@ -172,6 +172,16 @@ distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 | POST   | `/api/.../indicadores/graficos`                   |
 | GET    | `/api/organizacoes/{id}/conexoes/{cid}/painel`    |
 | DELETE | `/api/.../indicadores/{iid}`                      |
+| GET    | `/api/organizacoes/{id}/dashboards`               |
+| POST   | `/api/organizacoes/{id}/dashboards`               |
+| GET    | `/api/organizacoes/{id}/dashboards/{did}`         |
+| PATCH  | `/api/organizacoes/{id}/dashboards/{did}`         |
+| PUT    | `/api/.../dashboards/{did}/indicadores`           |
+| DELETE | `/api/organizacoes/{id}/dashboards/{did}`         |
+| GET    | `/api/organizacoes/{id}/conexoes/{cid}/campos`    |
+| POST   | `/api/organizacoes/{id}/conexoes/{cid}/campos`    |
+| PATCH  | `/api/.../conexoes/{cid}/campos/{campo}`         |
+| DELETE | `/api/.../conexoes/{cid}/campos/{campo}`         |
 | GET    | `/api/segmentos`                                  |
 | DELETE | `/api/organizacoes/{id}/conexoes/{cid}`           |
 
@@ -186,7 +196,7 @@ entra na organização quando se cadastrar.
 - [x] Assistente em etapas para cadastrar a conexão
 - [x] Sugestão de rótulo e papel por LLM
 - [x] Indicadores por ramo de negócio, com confirmação dos campos
-- [ ] Campos calculados
+- [x] Campos calculados
 - [x] Painel com os indicadores calculados no banco do cliente
 - [x] Tipo de gráfico sugerido e trocável, com número, barra, linha, pizza e tabela
-- [ ] Dashboards com os indicadores da organização
+- [x] Dashboards com os indicadores da organização
