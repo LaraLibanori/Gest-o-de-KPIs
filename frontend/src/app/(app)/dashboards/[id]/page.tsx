@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Check, Settings2, Trash2 } from "lucide-react";
+import { Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
@@ -22,6 +22,7 @@ import Evolucao from "@/components/painel/evolucao";
 import Tile from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -380,23 +381,19 @@ function EscolherIndicadores({
                       const marcado = marcados.includes(i.id);
                       return (
                         <li key={i.id}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() =>
-                              setMarcados((antes) =>
-                                marcado
-                                  ? antes.filter((x) => x !== i.id)
-                                  : [...antes, i.id],
-                              )
-                            }
-                          >
-                            <Check
-                              className={`size-4 ${marcado ? "opacity-100" : "opacity-0"}`}
+                          <label className="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-md p-2 text-sm transition-colors">
+                            <Checkbox
+                              checked={marcado}
+                              onCheckedChange={() =>
+                                setMarcados((antes) =>
+                                  marcado
+                                    ? antes.filter((x) => x !== i.id)
+                                    : [...antes, i.id],
+                                )
+                              }
                             />
                             {i.nome}
-                          </Button>
+                          </label>
                         </li>
                       );
                     })}

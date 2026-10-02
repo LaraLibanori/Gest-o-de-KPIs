@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Quebra } from "@/lib/api";
 import { cheio, curto } from "@/lib/numero";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const L = 720;
@@ -123,7 +124,7 @@ export default function Evolucao({
 
   if (validos.length < 2)
     return carregando ? (
-      <div className="bg-muted/40 h-60 w-full animate-pulse rounded-sm" />
+      <Skeleton className="h-60 w-full" />
     ) : (
       <div className="text-muted-foreground flex h-60 items-center justify-center text-sm">
         Sem série temporal para desenhar

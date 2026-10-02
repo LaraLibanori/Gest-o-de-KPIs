@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const NIVEIS = new Set(["media", "minimo", "maximo"]);
@@ -127,12 +128,10 @@ export default function Composicao({
                   )}
                 >
                   <span className="truncate text-sm">{p.rotulo}</span>
-                  <span className="bg-muted h-2 overflow-hidden rounded-full">
-                    <span
-                      className="bg-chart-1 block h-full rounded-full transition-[width] duration-500"
-                      style={{ width: `${fatia}%` }}
-                    />
-                  </span>
+                  <Progress
+                    value={fatia}
+                    className="h-2 [&>[data-slot=progress-indicator]]:bg-chart-1 [&>[data-slot=progress-indicator]]:transition-[transform] [&>[data-slot=progress-indicator]]:duration-500"
+                  />
                   <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
                     {curto(valor)}
                     <span className="ml-1 opacity-70">
