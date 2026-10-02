@@ -1,10 +1,19 @@
 "use client";
 
-import { Check, Database, Layers, Sheet, Table2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  Check,
+  Database,
+  Layers,
+  Search,
+  Sheet,
+  Table2,
+} from "lucide-react";
 import type { Relacao } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -25,8 +34,10 @@ export default function PassoTabela({
   escolhida,
   ocupado,
   rotuloCancelar,
+  podeVoltar,
   onEscolher,
   onEsquema,
+  onVoltar,
   onFechar,
 }: {
   relacoes: Relacao[];
@@ -35,15 +46,25 @@ export default function PassoTabela({
   escolhida: string | null;
   ocupado: boolean;
   rotuloCancelar: string;
+  podeVoltar: boolean;
   onEscolher: (r: Relacao) => void;
   onEsquema: (esquema: string | null) => void;
+  onVoltar: () => void;
   onFechar: () => void;
 }) {
+  const [busca, setBusca] = useState("");
+
+  const filtradas = useMemo(() => {
+    const alvo = busca.trim().toLowerCase();
+    if (!alvo) return relacoes;
+    return relacoes.filter((r) => r.nome.toLowerCase().includes(alvo));
+  }, [relacoes, busca]);
+
   return (
-    <>
+    <div className="space-y-4">
       {esquemas.length > 1 && (
-        <div className="mb-4 flex items-center gap-3">
-          <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-sm">
             <Layers className="size-4" />
             Schema
           </span>
@@ -52,7 +73,7 @@ export default function PassoTabela({
             onValueChange={(v) => onEsquema(v === TODOS ? null : v)}
             disabled={ocupado}
           >
-            <SelectTrigger className="w-full font-mono" size="sm">
+            <SelectTrigger className="flex-1 font-mono" size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -67,43 +88,83 @@ export default function PassoTabela({
         </div>
       )}
 
-      <div className="my-4 max-h-80 space-y-1 overflow-y-auto">
-        {ocupado ? (
-          [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)
-        ) : relacoes.length === 0 ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">
-            Nenhuma tabela visível para esse usuário.
-          </p>
-        ) : (
-          relacoes.map((r) => {
+      {!ocupado && relacoes.length > 8 && (
+        <div className="relative">
+          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+          <Input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="filtrar por nome"
+            className="pl-9"
+          />
+        </div>
+      )}
+
+      {ocupado ? (
+        <div className="space-y-1.5">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-13 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : relacoes.length === 0 ? (
+        <p className="text-muted-foreground py-10 text-center text-sm">
+          Nenhuma tabela visível para esse usuário.
+        </p>
+      ) : filtradas.length === 0 ? (
+        <p className="text-muted-foreground py-10 text-center text-sm">
+          Nada com esse nome. Tente parte do nome, sem o schema.
+        </p>
+      ) : (
+        <ul className="max-h-72 space-y-1 overflow-y-auto">
+          {filtradas.map((r) => {
             const Icone = ICONE[r.tipo];
+            const ativo = escolhida === r.nome;
             return (
-              <button
-                key={r.nome}
-                onClick={() => onEscolher(r)}
-                className="hover:bg-accent flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors"
-              >
-                <Icone className="text-muted-foreground size-4 shrink-0" />
-                <span className="flex-1 truncate font-mono text-sm">
-                  {r.nome}
-                </span>
-                <Badge variant="outline">{r.tipo}</Badge>
-                {escolhida === r.nome && (
-                  <Check className="text-primary size-4" />
-                )}
-              </button>
+              <li key={r.nome}>
+                <button
+                  onClick={() => onEscolher(r)}
+                  className={
+                    "flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors " +
+                    (ativo
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-accent hover:border-foreground/20")
+                  }
+                >
+                  <Icone className="text-muted-foreground size-4 shrink-0" />
+                  <span className="flex-1 truncate font-mono text-sm">
+                    {r.nome}
+                  </span>
+                  <Badge variant="outline">{r.tipo}</Badge>
+                  {ativo && <Check className="text-primary size-4 shrink-0" />}
+                </button>
+              </li>
             );
-          })
-        )}
-      </div>
+          })}
+        </ul>
+      )}
+
       <p className="text-muted-foreground text-xs">
-        View materializada costuma responder mais rápido que view comum.
+        Escolha a tabela que guarda os registros do dia a dia. View
+        materializada costuma responder mais rápido que view comum.
       </p>
-      <DialogFooter>
+
+      <div className="flex items-center gap-2 border-t pt-4">
+        {podeVoltar && (
+          <Button variant="ghost" onClick={onVoltar}>
+            <ArrowLeft className="size-4" />
+            Voltar
+          </Button>
+        )}
         <Button variant="ghost" onClick={onFechar}>
           {rotuloCancelar}
         </Button>
-      </DialogFooter>
-    </>
+        <div className="flex-1" />
+        <span className="text-muted-foreground text-xs">
+          {ocupado
+            ? "lendo…"
+            : `${filtradas.length} de ${relacoes.length} tabela${relacoes.length === 1 ? "" : "s"}`}
+        </span>
+      </div>
+    </div>
   );
 }

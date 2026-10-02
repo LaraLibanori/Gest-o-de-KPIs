@@ -1,10 +1,8 @@
 "use client";
 
-import { CircleCheck, Loader2, Plug, TriangleAlert } from "lucide-react";
+import { ChevronDown, Loader2, Plug, ShieldCheck } from "lucide-react";
 import type { Conexao } from "@/lib/api";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -52,7 +50,6 @@ export default function PassoCredenciais({
   setForm,
   ocupado,
   testando,
-  aviso,
   editando,
   podeTestar,
   onTestar,
@@ -63,36 +60,42 @@ export default function PassoCredenciais({
   setForm: (f: Credenciais) => void;
   ocupado: boolean;
   testando: boolean;
-  aviso: Aviso | null;
   editando: boolean;
   podeTestar: boolean;
   onTestar: () => void;
   onEnviar: (e: React.FormEvent) => void;
   onCancelar: () => void;
 }) {
+  const trocar = (campo: keyof Credenciais) => (v: string) =>
+    setForm({ ...form, [campo]: v });
+
   return (
-    <form onSubmit={onEnviar}>
-      <FieldGroup className="my-6">
+    <form onSubmit={onEnviar} className="space-y-6">
+      <FieldGroup className="gap-5">
         <Field>
-          <FieldLabel htmlFor="nome">Nome</FieldLabel>
+          <FieldLabel htmlFor="nome">Como esta conexão se chama?</FieldLabel>
           <Input
             id="nome"
             placeholder="Produção"
             value={form.nome}
-            onChange={(e) => setForm({ ...form, nome: e.target.value })}
+            onChange={(e) => trocar("nome")(e.target.value)}
             maxLength={120}
             required
             autoFocus
           />
+          <FieldDescription>
+            Serve para você reconhecer depois. Pode ter várias do mesmo banco.
+          </FieldDescription>
         </Field>
-        <div className="grid grid-cols-[1fr_100px] gap-4">
+
+        <div className="grid gap-5 sm:grid-cols-[1fr_7rem]">
           <Field>
-            <FieldLabel htmlFor="host">Host</FieldLabel>
+            <FieldLabel htmlFor="host">Endereço do servidor</FieldLabel>
             <Input
               id="host"
               placeholder="db.empresa.com"
               value={form.host}
-              onChange={(e) => setForm({ ...form, host: e.target.value })}
+              onChange={(e) => trocar("host")(e.target.value)}
               required
             />
           </Field>
@@ -102,81 +105,83 @@ export default function PassoCredenciais({
               id="porta"
               type="number"
               value={form.porta}
-              onChange={(e) => setForm({ ...form, porta: e.target.value })}
+              onChange={(e) => trocar("porta")(e.target.value)}
               required
             />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+
+        <div className="grid gap-5 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="banco">Banco</FieldLabel>
             <Input
               id="banco"
               placeholder="postgres"
               value={form.banco}
-              onChange={(e) => setForm({ ...form, banco: e.target.value })}
+              onChange={(e) => trocar("banco")(e.target.value)}
               required
             />
-            <FieldDescription>
-              O servidor a que você se conecta. No Supabase é sempre{" "}
-              <span className="font-mono">postgres</span>.
-            </FieldDescription>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="esquema">Schema</FieldLabel>
-            <Input
-              id="esquema"
-              placeholder="deixe vazio para ver todos"
-              value={form.esquema}
-              onChange={(e) => setForm({ ...form, esquema: e.target.value })}
-            />
-            <FieldDescription>
-              Onde as tabelas moram dentro do banco. Não é o banco.
-            </FieldDescription>
-          </Field>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="usuario">Usuário</FieldLabel>
             <Input
               id="usuario"
               autoComplete="off"
               value={form.usuario}
-              onChange={(e) => setForm({ ...form, usuario: e.target.value })}
+              onChange={(e) => trocar("usuario")(e.target.value)}
               required
             />
           </Field>
-          <Field>
-            <FieldLabel htmlFor="senha">Senha</FieldLabel>
-            <Input
-              id="senha"
-              type="password"
-              autoComplete="new-password"
-              placeholder={editando ? "deixe vazio para manter" : undefined}
-              value={form.senha}
-              onChange={(e) => setForm({ ...form, senha: e.target.value })}
-              required={!editando}
-            />
-          </Field>
         </div>
-        <FieldDescription>
-          Um usuário só de leitura basta, e é mais seguro.
-        </FieldDescription>
+
+        <Field>
+          <FieldLabel htmlFor="senha">Senha</FieldLabel>
+          <Input
+            id="senha"
+            type="password"
+            autoComplete="new-password"
+            placeholder={
+              editando ? "deixe vazio para manter a atual" : undefined
+            }
+            value={form.senha}
+            onChange={(e) => trocar("senha")(e.target.value)}
+            required={!editando}
+          />
+          <FieldDescription className="flex items-center gap-1.5">
+            <ShieldCheck className="size-3.5" />
+            Um usuário só de leitura basta. A senha é guardada cifrada e não
+            volta para a tela.
+          </FieldDescription>
+        </Field>
+
+        <details className="group border-t pt-4">
+          <summary className="text-muted-foreground flex cursor-pointer list-none items-center gap-1.5 text-sm hover:text-foreground">
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+            Schema e outros ajustes
+          </summary>
+          <FieldGroup className="mt-4 gap-5">
+            <Field>
+              <FieldLabel htmlFor="esquema">Schema</FieldLabel>
+              <Input
+                id="esquema"
+                placeholder="deixe vazio para ver todos"
+                value={form.esquema}
+                onChange={(e) => trocar("esquema")(e.target.value)}
+              />
+              <FieldDescription>
+                Onde as tabelas moram dentro do banco. Não é o banco. A próxima
+                etapa também deixa escolher.
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+        </details>
       </FieldGroup>
-      {aviso && (
-        <Alert
-          variant={aviso.tipo === "erro" ? "destructive" : "default"}
-          className="mb-2"
-        >
-          {aviso.tipo === "erro" ? <TriangleAlert /> : <CircleCheck />}
-          <AlertTitle>{aviso.titulo}</AlertTitle>
-          <AlertDescription>{aviso.texto}</AlertDescription>
-        </Alert>
-      )}
-      <DialogFooter>
+
+      <div className="flex flex-wrap items-center gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onCancelar}>
           {editando ? "Fechar" : "Cancelar"}
         </Button>
+        <div className="flex-1" />
         <Button
           type="button"
           variant="outline"
@@ -189,13 +194,13 @@ export default function PassoCredenciais({
           }
         >
           {testando ? <Loader2 className="animate-spin" /> : <Plug />}
-          Testar conexão
+          Testar sem salvar
         </Button>
         <Button type="submit" disabled={ocupado || testando}>
           {ocupado && <Loader2 className="animate-spin" />}
           {editando ? "Salvar e reconectar" : "Conectar"}
         </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 }

@@ -23,9 +23,9 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RecadoAlerta } from "@/components/assistente/aviso";
 import PassoCatalogo from "@/components/assistente/catalogo";
 import PassoCredenciais, {
   de as credenciaisDe,
@@ -35,38 +35,47 @@ import PassoCredenciais, {
 import PassoIndicadores from "@/components/assistente/indicadores";
 import PassoNegocio from "@/components/assistente/negocio";
 import PassoTabela from "@/components/assistente/tabela";
+import Trilha from "@/components/assistente/trilha";
 
 type Etapa = "credenciais" | "tabela" | "negocio" | "catalogo" | "indicadores";
 
-const ETAPAS: { id: Etapa; titulo: string; descricao: string }[] = [
+const ETAPAS: {
+  id: Etapa;
+  curto: string;
+  titulo: string;
+  descricao: string;
+}[] = [
   {
     id: "credenciais",
-    titulo: "Acesso ao banco",
+    curto: "Acesso",
+    titulo: "Conectar ao banco",
     descricao: "A senha é guardada cifrada e nunca volta para a tela.",
   },
   {
     id: "tabela",
-    titulo: "Tabela fato",
-    descricao: "A tabela que consolida os registros do dia a dia.",
+    curto: "Tabela",
+    titulo: "Escolher a tabela fato",
+    descricao: "A tabela que guarda os registros do dia a dia.",
   },
   {
     id: "negocio",
-    titulo: "Seu negócio",
-    descricao: "Ajuda a plataforma a nomear os campos e sugerir indicadores.",
+    curto: "Contexto",
+    titulo: "Sobre o seu negócio",
+    descricao: "Ajuda a nomear os campos e sugerir os indicadores.",
   },
   {
     id: "catalogo",
-    titulo: "Campos",
-    descricao: "Confira o que a plataforma entendeu de cada coluna.",
+    curto: "Campos",
+    titulo: "O que cada coluna é",
+    descricao: "Confira o que a plataforma entendeu. Dá para corrigir.",
   },
   {
     id: "indicadores",
-    titulo: "Indicadores",
-    descricao: "Confirme de qual campo cada indicador é calculado.",
+    curto: "Indicadores",
+    titulo: "O que será calculado",
+    descricao: "Confirme de qual campo cada indicador sai.",
   },
 ];
-
-const LARGAS: Etapa[] = ["catalogo", "indicadores"];
 
 export default function Assistente({
   organizacaoId,
@@ -82,6 +91,7 @@ export default function Assistente({
   onFechar: (mudou: boolean) => void;
 }) {
   const [etapa, setEtapa] = useState<Etapa>("credenciais");
+  const [visitados, setVisitados] = useState<number[]>([0]);
   const [atual, setAtual] = useState<Conexao | null>(null);
   const [form, setForm] = useState(VAZIO);
   const [relacoes, setRelacoes] = useState<Relacao[]>([]);
@@ -101,6 +111,15 @@ export default function Assistente({
   const [testando, setTestando] = useState(false);
   const [descartando, setDescartando] = useState(false);
   const descartandoAgora = useRef(false);
+
+  function irPara(alvo: Etapa) {
+    setEtapa(alvo);
+    setVisitados((antes) =>
+      antes.includes(ETAPAS.findIndex((e) => e.id === alvo))
+        ? antes
+        : [...antes, ETAPAS.findIndex((e) => e.id === alvo)],
+    );
+  }
 
   const base = `/organizacoes/${organizacaoId}/conexoes`;
 
@@ -144,6 +163,7 @@ export default function Assistente({
     setMudou(false);
     setCriada(false);
     setAviso(null);
+    setVisitados([0]);
     setTestando(false);
     setDescartando(false);
     setDescartados([]);
@@ -261,7 +281,7 @@ export default function Assistente({
       setAtual(nova);
       setForm(credenciaisDe(nova));
       setMudou(true);
-      setEtapa("tabela");
+      irPara("tabela");
     } catch (err) {
       if (!atual && nova) await descartar(nova.id);
       setAviso({
@@ -288,7 +308,7 @@ export default function Assistente({
           }),
         }),
       );
-      setEtapa("negocio");
+      irPara("negocio");
     } catch (e) {
       falhar(e);
     } finally {
@@ -330,7 +350,7 @@ export default function Assistente({
       setCampos(
         await api<Campo[]>(`${base}/${atual.id}/catalogo`, { method: "POST" }),
       );
-      setEtapa("catalogo");
+      irPara("catalogo");
       sugerir(atual.id);
     } catch (err) {
       falhar(err);
@@ -359,7 +379,7 @@ export default function Assistente({
 
   async function montarIndicadores() {
     if (!atual || ocupado) return;
-    setEtapa("indicadores");
+    irPara("indicadores");
     setOcupado(true);
     try {
       const p = await api<Proposta>(`${base}/${atual.id}/indicadores/propor`, {
@@ -513,99 +533,119 @@ export default function Assistente({
     <>
       <Dialog open={aberto} onOpenChange={(o) => !o && pedirFechar()}>
         <DialogContent
-          className={LARGAS.includes(etapa) ? "sm:max-w-2xl" : "sm:max-w-lg"}
+          className="max-h-[85vh] grid-rows-[auto_1fr] gap-0 overflow-hidden p-0 sm:max-w-3xl"
           showCloseButton={false}
         >
-          <DialogHeader>
-            <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs">
-              {ETAPAS.map((e, i) => (
-                <span
-                  key={e.id}
-                  className={
-                    "h-1 flex-1 rounded-full " +
-                    (i <= indice ? "bg-primary" : "bg-muted")
-                  }
-                />
-              ))}
+          <div className="border-b px-6 pt-5 pb-4">
+            <Trilha
+              itens={ETAPAS}
+              indice={indice}
+              visited={visitados}
+              onIr={(i) => irPara(ETAPAS[i].id)}
+            />
+
+            <div className="mt-5 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-lg">{passo.titulo}</DialogTitle>
+                <DialogDescription className="mt-0.5">
+                  {passo.descricao}
+                </DialogDescription>
+              </div>
+              <span className="text-muted-foreground shrink-0 text-xs">
+                Etapa {indice + 1} de {ETAPAS.length}
+              </span>
             </div>
-            <DialogTitle>{passo.titulo}</DialogTitle>
-            <DialogDescription>
-              Etapa {indice + 1} de {ETAPAS.length} · {passo.descricao}
-            </DialogDescription>
-          </DialogHeader>
+          </div>
 
-          {etapa === "credenciais" && (
-            <PassoCredenciais
-              form={form}
-              setForm={setForm}
-              ocupado={ocupado}
-              testando={testando}
-              aviso={aviso}
-              editando={atual !== null}
-              podeTestar={!atual || form.senha.trim().length > 0}
-              onTestar={testar}
-              onEnviar={salvarCredenciais}
-              onCancelar={pedirFechar}
+          <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-5">
+            <RecadoAlerta
+              recado={
+                aviso
+                  ? {
+                      tipo: aviso.tipo === "okto" ? "ok" : "erro",
+                      titulo: aviso.titulo,
+                      texto: aviso.texto,
+                    }
+                  : null
+              }
             />
-          )}
 
-          {etapa === "tabela" && (
-            <PassoTabela
-              relacoes={relacoes}
-              esquemas={esquemas}
-              esquema={esquema}
-              escolhida={atual?.tabela_fato ?? null}
-              ocupado={ocupado}
-              rotuloCancelar={rotuloCancelar}
-              onEscolher={escolherTabela}
-              onEsquema={trocarEsquema}
-              onFechar={pedirFechar}
-            />
-          )}
+            {etapa === "credenciais" && (
+              <PassoCredenciais
+                form={form}
+                setForm={setForm}
+                ocupado={ocupado}
+                testando={testando}
+                editando={atual !== null}
+                podeTestar={!atual || form.senha.trim().length > 0}
+                onTestar={testar}
+                onEnviar={salvarCredenciais}
+                onCancelar={pedirFechar}
+              />
+            )}
 
-          {etapa === "negocio" && (
-            <PassoNegocio
-              negocio={negocio}
-              setNegocio={setNegocio}
-              segmento={segmento}
-              setSegmento={setSegmento}
-              segmentos={segmentos}
-              ocupado={ocupado}
-              rotuloCancelar={rotuloCancelar}
-              onEnviar={salvarNegocio}
-              onVoltar={() => setEtapa("tabela")}
-              onCancelar={pedirFechar}
-            />
-          )}
+            {etapa === "tabela" && (
+              <PassoTabela
+                relacoes={relacoes}
+                esquemas={esquemas}
+                esquema={esquema}
+                escolhida={atual?.tabela_fato ?? null}
+                ocupado={ocupado}
+                rotuloCancelar={rotuloCancelar}
+                podeVoltar={atual !== null}
+                onVoltar={() => irPara("credenciais")}
+                onEscolher={escolherTabela}
+                onEsquema={trocarEsquema}
+                onFechar={pedirFechar}
+              />
+            )}
 
-          {etapa === "catalogo" && (
-            <PassoCatalogo
-              campos={campos}
-              tabela={atual?.tabela_fato ?? null}
-              ocupado={ocupado}
-              sugerindo={sugerindo}
-              rotuloCancelar={rotuloCancelar}
-              onMudarPapel={mudarPapel}
-              onFechar={pedirFechar}
-              onAvancar={montarIndicadores}
-            />
-          )}
+            {etapa === "negocio" && (
+              <PassoNegocio
+                negocio={negocio}
+                setNegocio={setNegocio}
+                segmento={segmento}
+                setSegmento={setSegmento}
+                segmentos={segmentos}
+                ocupado={ocupado}
+                rotuloCancelar={rotuloCancelar}
+                onEnviar={salvarNegocio}
+                onVoltar={() => irPara("tabela")}
+                onCancelar={pedirFechar}
+              />
+            )}
 
-          {etapa === "indicadores" && (
-            <PassoIndicadores
-              indicadores={indicadores}
-              campos={campos}
-              descartados={descartados}
-              ocupado={ocupado}
-              rotuloCancelar={rotuloCancelar}
-              onTrocarColuna={trocarColuna}
-              onTrocarGrafico={trocarGrafico}
-              onRemover={removerIndicador}
-              onCriar={criarIndicador}
-              onFechar={pedirFechar}
-              onConcluir={concluir}
-            />
-          )}
+            {etapa === "catalogo" && (
+              <PassoCatalogo
+                campos={campos}
+                tabela={atual?.tabela_fato ?? null}
+                ocupado={ocupado}
+                sugerindo={sugerindo}
+                rotuloCancelar={rotuloCancelar}
+                onVoltar={() => irPara("negocio")}
+                onMudarPapel={mudarPapel}
+                onFechar={pedirFechar}
+                onAvancar={montarIndicadores}
+              />
+            )}
+
+            {etapa === "indicadores" && (
+              <PassoIndicadores
+                indicadores={indicadores}
+                campos={campos}
+                descartados={descartados}
+                ocupado={ocupado}
+                rotuloCancelar={rotuloCancelar}
+                onVoltar={() => irPara("catalogo")}
+                onTrocarColuna={trocarColuna}
+                onTrocarGrafico={trocarGrafico}
+                onRemover={removerIndicador}
+                onCriar={criarIndicador}
+                onFechar={pedirFechar}
+                onConcluir={concluir}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

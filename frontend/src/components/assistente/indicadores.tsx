@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, TriangleAlert, X } from "lucide-react";
 import {
   AGREGACOES,
   GRAFICOS,
@@ -18,7 +18,6 @@ import {
 import Confirmar from "@/components/confirmar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -197,6 +196,7 @@ export default function PassoIndicadores({
   onRemover,
   onCriar,
   rotuloCancelar,
+  onVoltar,
   onFechar,
   onConcluir,
 }: {
@@ -209,6 +209,7 @@ export default function PassoIndicadores({
   onRemover: (indicador: Indicador) => void;
   onCriar: (novo: IndicadorNovo) => Promise<void>;
   rotuloCancelar: string;
+  onVoltar: () => void;
   onFechar: () => void;
   onConcluir: () => void;
 }) {
@@ -333,17 +334,22 @@ export default function PassoIndicadores({
         </Button>
       )}
 
-      <DialogFooter>
+      <div className="flex items-center gap-2 border-t pt-4">
+        <Button variant="ghost" onClick={onVoltar}>
+          <ArrowLeft className="size-4" />
+          Voltar
+        </Button>
         <Button variant="ghost" onClick={onFechar}>
           {rotuloCancelar}
         </Button>
+        <div className="flex-1" />
         <Button
           onClick={onConcluir}
           disabled={ocupado || indicadores.length === 0}
         >
           Concluir
         </Button>
-      </DialogFooter>
+      </div>
 
       <Confirmar
         aberto={aRemover !== null}

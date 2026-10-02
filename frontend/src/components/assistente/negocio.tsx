@@ -1,9 +1,8 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import type { Segmento } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { DialogFooter } from "@/components/ui/dialog";
 import {
   Field,
   FieldDescription,
@@ -43,8 +42,8 @@ export default function PassoNegocio({
   onCancelar: () => void;
 }) {
   return (
-    <form onSubmit={onEnviar}>
-      <FieldGroup className="my-6">
+    <form onSubmit={onEnviar} className="space-y-6">
+      <FieldGroup className="gap-5">
         <Field>
           <FieldLabel htmlFor="negocio">O que sua empresa faz?</FieldLabel>
           <Textarea
@@ -79,18 +78,20 @@ export default function PassoNegocio({
           </FieldDescription>
         </Field>
       </FieldGroup>
-      <DialogFooter>
+      <div className="flex items-center gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={onVoltar}>
+          <ArrowLeft className="size-4" />
           Voltar
         </Button>
         <Button type="button" variant="ghost" onClick={onCancelar}>
           {rotuloCancelar}
         </Button>
+        <div className="flex-1" />
         <Button type="submit" disabled={ocupado}>
           {ocupado && <Loader2 className="animate-spin" />}
           Ler os campos
         </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 }
