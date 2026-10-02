@@ -182,8 +182,22 @@ class Campo(BaseModel):
     cardinalidade: int | None
     papel: Literal["metrica", "dimensao", "tempo", "ignorar"]
     rotulo: str | None
+    formula: str | None = None
     confirmado: bool
     ordem: int
+
+
+class CampoCalculadoIn(BaseModel):
+    nome: str = Field(min_length=1, max_length=60, pattern=r"^[a-z_][a-z0-9_]*$")
+    rotulo: str = Field(min_length=1, max_length=120)
+    formula: str = Field(min_length=1, max_length=400)
+    papel: Literal["metrica", "dimensao"] = "metrica"
+
+
+class CampoCalculadoPatch(BaseModel):
+    rotulo: str | None = Field(default=None, max_length=120)
+    formula: str | None = Field(default=None, max_length=400)
+    papel: Literal["metrica", "dimensao"] | None = None
 
 
 class Sugestao(BaseModel):

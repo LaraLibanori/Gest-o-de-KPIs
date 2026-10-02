@@ -6,6 +6,7 @@ from sqlalchemy import delete, func, select
 from ..auth import CurrentUser
 from ..calculo import JANELA_PADRAO, calcular, compor
 from ..db import Sessao
+from ..formula import FormulaInvalida, analisar, derivar
 from ..indicadores import (
     PAPEIS_ACEITOS,
     QUANTOS,
@@ -22,6 +23,9 @@ from ..models import SegmentoKpi as KpiDb
 from ..permissoes import exigir_dono, papel
 from ..schemas import (
     JANELA,
+    Campo,
+    CampoCalculadoIn,
+    CampoCalculadoPatch,
     Composicao,
     Dimensao,
     Indicador,
@@ -266,6 +270,111 @@ async def remover_indicador(
     await sessao.commit()
 
 
+async def _conferir_formula(
+    sessao: Sessao, conexao_id: UUID, nome: str, formula: str
+) -> None:
+    """Rejeita antes de gravar: formula que aponta para campo posterior é ciclo."""
+    catalogo = await campos(sessao, conexao_id)
+    base = {c.coluna for c in catalogo if not c.formula and c.coluna != nome}
+    try:
+        analisar(formula, base, base)
+    except FormulaInvalida as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@router.get("/{conexao_id}/campos", response_model=list[Campo])
+async def listar_campos(
+    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+):
+    await papel(sessao, organizacao_id, user.id)
+    await buscar(sessao, organizacao_id, conexao_id)
+    return [c for c in await campos(sessao, conexao_id) if c.formula]
+
+
+@router.post("/{conexao_id}/campos", response_model=Campo, status_code=201)
+async def criar_campo(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    dados: CampoCalculadoIn,
+    user: CurrentUser,
+    sessao: Sessao,
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "criar campo calculado")
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    if not conexao.tabela_fato:
+        raise HTTPException(422, "escolha a tabela fato antes de criar campo")
+    if any(c.coluna == dados.nome for c in await campos(sessao, conexao_id)):
+        raise HTTPException(409, "esse nome já existe no catálogo")
+    await _conferir_formula(sessao, conexao_id, dados.nome, dados.formula)
+
+    ultimo = await sessao.scalar(
+        select(func.coalesce(func.max(CampoDb.ordem), 0)).where(
+            CampoDb.conexao_id == conexao_id
+        )
+    )
+    campo = CampoDb(
+        conexao_id=conexao_id,
+        coluna=dados.nome,
+        tipo="numeric",
+        cardinalidade=None,
+        papel=dados.papel,
+        rotulo=dados.rotulo,
+        formula=dados.formula,
+        confirmado=True,
+        ordem=ultimo + 1,
+    )
+    sessao.add(campo)
+    await sessao.commit()
+    return campo
+
+
+@router.patch("/{conexao_id}/campos/{campo_id}", response_model=Campo)
+async def ajustar_campo(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    campo_id: UUID,
+    dados: CampoCalculadoPatch,
+    user: CurrentUser,
+    sessao: Sessao,
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "editar campo calculado")
+    campo = await sessao.scalar(
+        select(CampoDb).where(CampoDb.id == campo_id, CampoDb.conexao_id == conexao_id)
+    )
+    if campo is None or not campo.formula:
+        raise HTTPException(404, "campo calculado não encontrado")
+    if dados.formula is not None:
+        await _conferir_formula(sessao, conexao_id, campo.coluna, dados.formula)
+        campo.formula = dados.formula
+    if dados.rotulo is not None:
+        campo.rotulo = dados.rotulo
+    if dados.papel is not None:
+        campo.papel = dados.papel
+    await sessao.commit()
+    return campo
+
+
+@router.delete("/{conexao_id}/campos/{campo_id}", status_code=204)
+async def remover_campo(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    campo_id: UUID,
+    user: CurrentUser,
+    sessao: Sessao,
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "apagar campo calculado")
+    resultado = await sessao.execute(
+        delete(CampoDb).where(
+            CampoDb.id == campo_id,
+            CampoDb.conexao_id == conexao_id,
+            CampoDb.formula.is_not(None),
+        )
+    )
+    if resultado.rowcount == 0:
+        raise HTTPException(404, "campo calculado não encontrado")
+    await sessao.commit()
+
+
 # So troca a forma de quem a llm acertou: o que ela sugerir fora do possivel cai.
 @router.post("/{conexao_id}/indicadores/graficos", response_model=SugestaoGrafico)
 async def sugerir_formas(
@@ -358,10 +467,13 @@ async def painel(
         )
 
     tabela = conexao.tabela_fato
+    calculados, _ = derivar(catalogo)
     try:
         valores = await consultar(
             conexao,
-            lambda externa: calcular(externa, tabela, linhas, janela, com_serie=serie),
+            lambda externa: calcular(
+                externa, tabela, linhas, janela, com_serie=serie, calculados=calculados
+            ),
         )
     except HTTPException as e:
         return Painel(
@@ -413,21 +525,25 @@ async def composicao(
     )
     if alvo is None:
         raise HTTPException(404, "indicador não encontrado")
-    if dimensao not in {c.coluna for c in await campos(sessao, conexao_id)}:
+    catalogo = await campos(sessao, conexao_id)
+    if dimensao not in {c.coluna for c in catalogo}:
         raise HTTPException(422, "essa coluna não existe no catálogo")
 
+    calculados, _ = derivar(catalogo)
     pontos = await consultar(
         conexao,
         lambda externa: compor(
-            externa, conexao.tabela_fato, alvo, dimensao, janela, limite
+            externa,
+            conexao.tabela_fato,
+            alvo,
+            dimensao,
+            janela,
+            limite,
+            calculados,
         ),
     )
     rotulo = next(
-        (
-            c.rotulo or c.coluna
-            for c in await campos(sessao, conexao_id)
-            if c.coluna == dimensao
-        ),
+        (c.rotulo or c.coluna for c in catalogo if c.coluna == dimensao),
         dimensao,
     )
     return Composicao(

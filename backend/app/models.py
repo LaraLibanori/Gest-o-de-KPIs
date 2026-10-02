@@ -171,6 +171,7 @@ class Campo(Base):
     cardinalidade: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     papel: Mapped[str] = mapped_column(Text)
     rotulo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    formula: Mapped[str | None] = mapped_column(Text, nullable=True)
     confirmado: Mapped[bool] = mapped_column(Boolean, server_default=sa.false())
     ordem: Mapped[int] = mapped_column(Integer)
 

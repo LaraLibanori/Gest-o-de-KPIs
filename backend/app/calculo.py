@@ -72,6 +72,17 @@ def _caiu(erro: Exception) -> bool:
     return isinstance(erro, asyncpg.PostgresConnectionError | asyncpg.InterfaceError)
 
 
+# Um nivel de subquery por campo, porque alias nao vale no mesmo select.
+def _fonte(tabela: str, calculados: list[tuple[str, str]] | None) -> str:
+    if not calculados:
+        return qualificar(*partir(tabela))
+    base = qualificar(*partir(tabela))
+    fonte = base
+    for nome, formula in calculados:
+        fonte = f"(select *, ({formula}) as {citar(nome)} from {fonte}) as c"
+    return fonte
+
+
 def _falha(erro: Exception) -> dict:
     if isinstance(erro, asyncpg.UndefinedColumnError):
         return {"erro": SEM_COLUNA}
@@ -148,10 +159,11 @@ async def calcular(
     indicadores,
     janela: str | None = None,
     com_serie: bool = True,
+    calculados: list[tuple[str, str]] | None = None,
 ) -> dict:
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     prazo = time.monotonic() + ORCAMENTO
-    de = qualificar(*partir(tabela))
+    de = _fonte(tabela, calculados)
     inicio, inicio_anterior, balde = janela_de(janela)
 
     com_campo = {
@@ -216,6 +228,7 @@ async def compor(
     dimensao: str,
     janela: str | None = None,
     limite: int = LIMITE_QUEBRA,
+    calculados: list[tuple[str, str]] | None = None,
 ) -> list[dict]:
     inicio, _, _ = janela_de(janela)
     tempo = indicador.tempo if indicador.tempo else None
@@ -224,7 +237,7 @@ async def compor(
         {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
         for r in await conexao.fetch(
             f"select {citar(dimensao)}::text as rotulo, {_conta(indicador)} as valor"
-            f" from {qualificar(*partir(tabela))}{onde} group by 1"
+            f" from {_fonte(tabela, calculados)}{onde} group by 1"
             f" order by 2 desc nulls last limit {int(limite)}",
         )
     ]
