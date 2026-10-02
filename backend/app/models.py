@@ -264,3 +264,48 @@ class Indicador(Base):
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+# Dashboard junta indicadores de varias conexoes da mesma organizacao.
+class Dashboard(Base):
+    __tablename__ = "dashboards"
+    __table_args__ = (
+        sa.UniqueConstraint("organizacao_id", "nome", name="dashboards_nome_unico"),
+        sa.Index("dashboards_organizacao", "organizacao_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    organizacao_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("organizacoes.id", ondelete="CASCADE")
+    )
+    nome: Mapped[str] = mapped_column(Text)
+    descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    criado_por: Mapped[UUID | None] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey(USUARIO, ondelete="CASCADE"), nullable=True
+    )
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DashboardIndicador(Base):
+    __tablename__ = "dashboard_indicadores"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "dashboard_id", "indicador_id", name="dashboard_indicadores_unico"
+        ),
+        sa.Index("dashboard_indicadores_dashboard", "dashboard_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    dashboard_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("dashboards.id", ondelete="CASCADE")
+    )
+    indicador_id: Mapped[UUID] = mapped_column(
+        PgUUID(as_uuid=True), ForeignKey("indicadores.id", ondelete="CASCADE")
+    )
+    ordem: Mapped[int] = mapped_column(Integer, server_default="0")

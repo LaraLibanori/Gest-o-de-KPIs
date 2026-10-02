@@ -315,3 +315,26 @@ class Painel(BaseModel):
 class SugestaoGrafico(BaseModel):
     aplicadas: int
     indicadores: list[Indicador]
+
+
+class DashboardIn(BaseModel):
+    nome: str = Field(min_length=1, max_length=80)
+    descricao: str | None = Field(default=None, max_length=200)
+
+
+class DashboardPatch(BaseModel):
+    nome: str | None = Field(default=None, min_length=1, max_length=80)
+    descricao: str | None = Field(default=None, max_length=200)
+
+
+class Dashboard(BaseModel):
+    id: UUID
+    nome: str
+    descricao: str | None = None
+    criado_em: datetime
+    indicadores: list[IndicadorCalculado] = []
+    conexoes: list[str] = []
+
+
+class DashboardIndicadoresIn(BaseModel):
+    indicadores: list[UUID] = Field(default_factory=list, max_length=40)

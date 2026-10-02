@@ -9,7 +9,15 @@ from sqlalchemy import text
 
 from .config import conferir_ambiente
 from .db import abrir_conexao
-from .routers import catalogo, conexoes, indicadores, organizacoes, perfil, segmentos
+from .routers import (
+    catalogo,
+    conexoes,
+    dashboards,
+    indicadores,
+    organizacoes,
+    perfil,
+    segmentos,
+)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
@@ -57,6 +65,7 @@ app.include_router(organizacoes.router)
 app.include_router(conexoes.router)
 app.include_router(catalogo.router)
 app.include_router(indicadores.router)
+app.include_router(dashboards.router)
 app.include_router(segmentos.router)
 
 
