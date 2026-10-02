@@ -124,8 +124,16 @@ export type Campo = {
   cardinalidade: number | null;
   papel: PapelCampo;
   rotulo: string | null;
+  formula?: string | null;
   confirmado: boolean;
   ordem: number;
+};
+
+export type CampoCalculadoIn = {
+  nome: string;
+  rotulo: string;
+  formula: string;
+  papel: "metrica" | "dimensao";
 };
 
 export type Segmento = { chave: string; nome: string };

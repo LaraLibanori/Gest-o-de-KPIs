@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
+import CamposCalculados from "@/components/painel/campos";
 import Composicao from "@/components/painel/composicao";
 import ControleJanela from "@/components/painel/janela";
 import Evolucao from "@/components/painel/evolucao";
@@ -160,6 +161,9 @@ export default function PainelDaConexao() {
         }
         acoes={
           <>
+            {base && (
+              <CamposCalculados base={`${base}/${id}`} colunas={campos} />
+            )}
             <ControleJanela
               janela={janela}
               desabilitado={!painel?.janelavel}
