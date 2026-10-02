@@ -19,6 +19,7 @@ from ..schemas import (
     DashboardIndicadoresIn,
     DashboardPatch,
     IndicadorCalculado,
+    ItemDashboard,
     Quebra,
 )
 from .comum import campos, consultar
@@ -58,7 +59,7 @@ async def _montar(
     for indicador in indicadores:
         por_conexao.setdefault(indicador.conexao_id, []).append(indicador)
 
-    saida: dict[UUID, IndicadorCalculado] = {}
+    saida: dict[UUID, ItemDashboard] = {}
     nomes: list[str] = []
 
     # Cada conexao e aberta e fechada por conta propria: sao bancos diferentes.
@@ -70,7 +71,7 @@ async def _montar(
         )
         if conexao is None or not conexao.tabela_fato:
             for indicador in grupo:
-                saida[indicador.id] = _vazio(indicador, "conexão sem tabela fato")
+                saida[indicador.id] = _vazio(indicador, "conexão sem tabela fato", None)
             continue
         nomes.append(conexao.nome)
         calculados, _ = derivar(await campos(sessao, conexao_id))
@@ -83,7 +84,7 @@ async def _montar(
             )
         except HTTPException as e:
             for indicador in grupo:
-                saida[indicador.id] = _vazio(indicador, str(e.detail))
+                saida[indicador.id] = _vazio(indicador, str(e.detail), conexao.nome)
             continue
         for indicador in grupo:
             calculado = IndicadorCalculado.model_validate(indicador)
@@ -93,7 +94,11 @@ async def _montar(
             calculado.variacao = dados.get("variacao")
             calculado.serie = [Quebra(**q) for q in dados.get("serie", [])]
             calculado.erro = dados.get("erro")
-            saida[indicador.id] = calculado
+            saida[indicador.id] = ItemDashboard(
+                **calculado.model_dump(),
+                conexao_id=conexao.id,
+                conexao=conexao.nome,
+            )
 
     return Dashboard(
         id=linha.id,
@@ -105,10 +110,12 @@ async def _montar(
     )
 
 
-def _vazio(indicador: IndicadorDb, erro: str) -> IndicadorCalculado:
+def _vazio(indicador: IndicadorDb, erro: str, nome: str | None) -> ItemDashboard:
     base = IndicadorCalculado.model_validate(indicador)
     base.erro = erro
-    return base
+    return ItemDashboard(
+        **base.model_dump(), conexao_id=indicador.conexao_id, conexao=nome or ""
+    )
 
 
 @router.get("", response_model=list[Dashboard])

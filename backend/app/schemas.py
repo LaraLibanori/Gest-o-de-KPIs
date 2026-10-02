@@ -327,12 +327,18 @@ class DashboardPatch(BaseModel):
     descricao: str | None = Field(default=None, max_length=200)
 
 
+class ItemDashboard(IndicadorCalculado):
+    # Sem isso a tela nao sabe de qual conexao o indicador veio.
+    conexao_id: UUID
+    conexao: str
+
+
 class Dashboard(BaseModel):
     id: UUID
     nome: str
     descricao: str | None = None
     criado_em: datetime
-    indicadores: list[IndicadorCalculado] = []
+    indicadores: list[ItemDashboard] = []
     conexoes: list[str] = []
 
 

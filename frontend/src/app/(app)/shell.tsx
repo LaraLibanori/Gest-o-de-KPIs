@@ -8,6 +8,7 @@ import {
   Check,
   ChevronsUpDown,
   Database,
+  LayoutDashboard,
   Loader2,
   LogOut,
   Plus,
@@ -55,6 +56,7 @@ import {
 
 const NAVEGACAO = [
   { href: "/", titulo: "Conexões", icone: Database },
+  { href: "/dashboards", titulo: "Dashboards", icone: LayoutDashboard },
   { href: "/configuracoes", titulo: "Configurações", icone: Settings },
 ];
 

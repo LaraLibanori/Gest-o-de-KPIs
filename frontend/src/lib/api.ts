@@ -264,6 +264,25 @@ export type IndicadorCalculado = Indicador & {
   erro: string | null;
 };
 
+export type ItemDashboard = IndicadorCalculado & {
+  conexao_id: string;
+  conexao: string;
+};
+
+export type Dashboard = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  criado_em: string;
+  indicadores: ItemDashboard[];
+  conexoes: string[];
+};
+
+export type DashboardIn = {
+  nome: string;
+  descricao?: string | null;
+};
+
 export type Dimensao = { coluna: string; rotulo: string };
 
 export type Composicao = {
