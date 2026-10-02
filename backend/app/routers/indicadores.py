@@ -38,8 +38,7 @@ from .comum import PREFIXO, buscar, campos, consultar
 router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
 
 
-# O que a pessoa pode escolher para quebrar o indicador. Nem chave nem data
-# entram: quebrar por id so rende um top-10 sem informacao, e a data e o eixo.
+# Nem chave nem data: quebrar por id so rende top-10, e a data e o eixo.
 def _dimensoes(catalogo: list[CampoDb], tempos: set) -> list[Dimensao]:
     return [
         Dimensao(coluna=c.coluna, rotulo=c.rotulo or c.coluna)

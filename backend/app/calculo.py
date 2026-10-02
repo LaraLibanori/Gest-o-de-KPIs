@@ -20,9 +20,7 @@ AGREGACOES = {
     "maximo": "max({})",
 }
 
-# A janela vem da requisicao, nao do indicador: assim um controle so move todos
-# os numeros da tela. Os fragmentos sao fixos, nunca texto do usuario.
-# (de onde comeca agora, de onde comeca a janela anterior, balde da serie)
+# Inicio de agora, inicio da janela anterior e balde da serie; fragmentos fixos.
 JANELAS: dict[str, tuple[str, str, str]] = {
     "7d": ("current_date - 7", "current_date - 14", "day"),
     "30d": ("current_date - 30", "current_date - 60", "day"),
@@ -85,9 +83,7 @@ def _falha(erro: Exception) -> dict:
     return {"erro": "não foi possível calcular"}
 
 
-# Agora e antes saem no mesmo select, com cada janela dentro do seu filter.
-# Nao pode haver where externo: o filtro de agregacao e aplicado sobre as linhas
-# que sobraram do where, e a janela anterior nunca casaria com nenhuma delas.
+# Sem where externo: o filtro de agregacao roda sobre o que sobrou do where.
 async def _valores(
     conexao, de: str, atual: str, antes: str, grupo: list, onde_atual: str = ""
 ) -> dict:
@@ -110,8 +106,7 @@ async def _valores(
         saida: dict[str, dict] = {}
         for indicador in grupo:
             try:
-                # Onde_atual ja vem com o " where"; passar de novo aqui geraria
-                # ">= coluna >= data" e o proprio resgate viraria syntax error.
+                # Onde_atual ja vem com o " where"; repetir viraria syntax error.
                 bruto = await conexao.fetchval(
                     f"select {_conta(indicador)} from {de}{onde_atual}"
                 )
