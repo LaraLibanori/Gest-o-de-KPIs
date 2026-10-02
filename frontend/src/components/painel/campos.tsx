@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, type Campo } from "@/lib/api";
+import { api, Conflito, type Campo } from "@/lib/api";
+import Confirmar from "@/components/confirmar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,6 +53,7 @@ export default function CamposCalculados({
   const [dados, setDados] = useState<Dados>(VAZIO);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [confirmando, setConfirmando] = useState<Campo | null>(null);
 
   const numericas = colunas
     .filter((c) => !c.formula && /int|num|real|double|money/i.test(c.tipo))
@@ -86,12 +89,20 @@ export default function CamposCalculados({
     }
   }
 
-  async function apagar(campo: Campo) {
+  async function apagar(campo: Campo, forcar = false) {
+    setConfirmando(null);
     try {
-      await api(`${base}/campos/${campo.id}`, { method: "DELETE" });
+      await api(`${base}/campos/${campo.id}${forcar ? "?forcar=1" : ""}`, {
+        method: "DELETE",
+      });
       await carregar();
       toast.success("campo apagado");
     } catch (e) {
+      // 409 significa que indicador depende do campo: perguntar antes de quebrar.
+      if (e instanceof Conflito) {
+        setConfirmando(campo);
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "não foi possível apagar");
     }
   }
@@ -127,6 +138,11 @@ export default function CamposCalculados({
                     {c.formula}
                   </p>
                 </div>
+                {!!c.em_uso && (
+                  <Badge variant="secondary" className="shrink-0">
+                    {c.em_uso} em uso
+                  </Badge>
+                )}
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -226,6 +242,20 @@ export default function CamposCalculados({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Confirmar
+        aberto={confirmando !== null}
+        titulo="Apagar mesmo assim?"
+        descricao={
+          confirmando && (confirmando.em_uso ?? 0) > 0
+            ? `${confirmando.em_uso} indicador${confirmando.em_uso === 1 ? "" : "es"} usa este campo e vai parar de funcionar.`
+            : "Este campo calculado será apagado."
+        }
+        acao="Apagar assim mesmo"
+        fecharAoConfirmar={false}
+        onConfirmar={() => confirmando && apagar(confirmando, true)}
+        onFechar={() => setConfirmando(null)}
+      />
     </Dialog>
   );
 }

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { ChartNoAxesColumn, RefreshCw, TriangleAlert } from "lucide-react";
+import {
+  ChartNoAxesColumn,
+  Info,
+  RefreshCw,
+  TriangleAlert,
+} from "lucide-react";
 import {
   api,
   JANELAS,
@@ -35,6 +40,15 @@ const JANELA_INICIAL: Janela = "30d";
 const SEM_ZERO = new Set(["media", "minimo", "maximo"]);
 const SOMAVEIS = new Set(["soma", "contagem", "distintos"]);
 
+// O custo esta na ida ao banco do cliente, nao no tamanho da resposta: um
+// painel pesa poucos KB. Por isso o cache e do navegador, e o servidor fica
+// fora. Vive fora do componente para sobreviver a navegacao.
+const FRESCO = 60_000;
+const cache = new Map<
+  string,
+  { rapido: Painel; completo?: Painel; em: number }
+>();
+
 export default function PainelDaConexao() {
   const { id } = useParams<{ id: string }>();
   const busca = useSearchParams();
@@ -54,6 +68,7 @@ export default function PainelDaConexao() {
   const [erro, setErro] = useState<string | null>(null);
   const pedido = useRef(0);
   const pintou = useRef(false);
+  const contexto = useRef(false);
 
   const base = aberta ? `/organizacoes/${aberta.id}/conexoes` : null;
 
@@ -66,33 +81,70 @@ export default function PainelDaConexao() {
     [campos],
   );
 
+  // Trocar de conexao nao remonta a tela, entao o contexto precisa ser zerado.
+  useEffect(() => {
+    contexto.current = false;
+    pintou.current = false;
+    setSelecionado(null);
+  }, [id]);
+
   const buscar = useCallback(
-    async (alvo: Janela) => {
+    async (alvo: Janela, forcar = false) => {
       if (!base) return;
       const meu = ++pedido.current;
-      setCarregando(true);
-      setCarregandoSerie(false);
-      pintou.current = false;
-      try {
-        const [lista, catalogo, rapido] = await Promise.all([
-          api<Conexao[]>(base),
-          api<Campo[]>(`${base}/${id}/catalogo`),
-          api<Painel>(`${base}/${id}/painel?janela=${alvo}&serie=0`),
-        ]);
-        if (meu !== pedido.current) return;
-        setConexao(lista.find((c) => c.id === id) ?? null);
-        setCampos(catalogo);
-        setPainel(rapido);
-        setErro(null);
-        pintou.current = true;
+      const chave = `${id}:${alvo}`;
+      const guardado = cache.get(chave);
+
+      // Mostra o que tem sem esperar e revalida por tras, sem piscar a tela.
+      if (guardado && !forcar) {
+        setPainel(guardado.completo ?? guardado.rapido);
         setCarregando(false);
-        setCarregandoSerie(true);
+        setCarregandoSerie(!guardado.completo);
+        pintou.current = true;
+        if (Date.now() - guardado.em < FRESCO) return;
+      } else {
+        setCarregando(true);
+        setCarregandoSerie(false);
+        pintou.current = false;
+      }
+
+      try {
+        // Atualizar recarrega o catalogo tambem: quem criou coluna nova no banco
+        // precisa ver a coluna sem sair da tela.
+        if (!contexto.current || forcar) {
+          const [lista, catalogo] = await Promise.all([
+            api<Conexao[]>(base),
+            api<Campo[]>(`${base}/${id}/catalogo`),
+          ]);
+          contexto.current = true;
+          setConexao(lista.find((c) => c.id === id) ?? null);
+          setCampos(catalogo);
+        }
+
+        if (!guardado || forcar) {
+          const rapido = await api<Painel>(
+            `${base}/${id}/painel?janela=${alvo}&serie=0`,
+          );
+          if (meu !== pedido.current) return;
+          setPainel(rapido);
+          setErro(null);
+          pintou.current = true;
+          setCarregando(false);
+          setCarregandoSerie(true);
+          cache.set(chave, { rapido, em: Date.now() });
+        }
 
         const completo = await api<Painel>(
           `${base}/${id}/painel?janela=${alvo}`,
         );
         if (meu !== pedido.current) return;
         setPainel(completo);
+        const anterior = cache.get(chave);
+        cache.set(chave, {
+          rapido: anterior?.rapido ?? completo,
+          completo,
+          em: Date.now(),
+        });
       } catch (e) {
         if (meu !== pedido.current) return;
         if (pintou.current) {
@@ -119,6 +171,9 @@ export default function PainelDaConexao() {
     if (!carregandoOrg) buscar(janela);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregandoOrg, buscar]);
+
+  // Indicador marcado nao sobrevive a troca de periodo.
+  useEffect(() => setSelecionado(null), [janela]);
 
   const todos = useMemo(() => painel?.indicadores ?? [], [painel]);
   const indicadores = useMemo(
@@ -169,14 +224,13 @@ export default function PainelDaConexao() {
               desabilitado={!painel?.janelavel}
               onMudar={(j) => {
                 setJanela(j);
-                setSelecionado(null);
                 buscar(j);
               }}
             />
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => buscar(janela)}
+              onClick={() => buscar(janela, true)}
               disabled={carregando}
               aria-label="Atualizar"
             >
@@ -192,6 +246,20 @@ export default function PainelDaConexao() {
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           {erro ?? painel?.erro}
         </p>
+      )}
+
+      {!!painel?.avisos?.length && (
+        <ul className="space-y-1.5">
+          {painel.avisos.map((a) => (
+            <li
+              key={a}
+              className="text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm"
+            >
+              <Info className="mt-0.5 size-4 shrink-0" />
+              {a}
+            </li>
+          ))}
+        </ul>
       )}
 
       {carregando && !painel ? (

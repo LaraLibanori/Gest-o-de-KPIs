@@ -18,6 +18,8 @@ from ..indicadores import (
 from ..introspeccao import TEMPO, identificador
 from ..llm import sugerir_graficos
 from ..models import Campo as CampoDb
+from ..models import Dashboard as DashboardDb
+from ..models import DashboardIndicador as VinculoDb
 from ..models import Indicador as IndicadorDb
 from ..models import SegmentoKpi as KpiDb
 from ..permissoes import exigir_dono, papel
@@ -258,8 +260,26 @@ async def remover_indicador(
     indicador_id: UUID,
     user: CurrentUser,
     sessao: Sessao,
+    forcar: bool = False,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "apagar indicador")
+    # Apagar o indicador leva junto o vinculo do dashboard: avisar antes.
+    dashboards = list(
+        await sessao.scalars(
+            select(DashboardDb.nome)
+            .join(VinculoDb, VinculoDb.dashboard_id == DashboardDb.id)
+            .where(
+                VinculoDb.indicador_id == indicador_id,
+                DashboardDb.organizacao_id == organizacao_id,
+            )
+        )
+    )
+    if dashboards and not forcar:
+        raise HTTPException(
+            409,
+            "este indicador está em " + ", ".join(dashboards) + " e vai sumir de lá",
+        )
+
     resultado = await sessao.execute(
         delete(IndicadorDb).where(
             IndicadorDb.id == indicador_id, IndicadorDb.conexao_id == conexao_id
@@ -268,6 +288,17 @@ async def remover_indicador(
     if resultado.rowcount == 0:
         raise HTTPException(404, "indicador não encontrado")
     await sessao.commit()
+
+
+async def _em_uso(sessao, conexao_id: UUID, coluna: str) -> int:
+    return int(
+        await sessao.scalar(
+            select(func.count())
+            .select_from(IndicadorDb)
+            .where(IndicadorDb.conexao_id == conexao_id, IndicadorDb.coluna == coluna)
+        )
+        or 0
+    )
 
 
 async def _conferir_formula(
@@ -288,7 +319,13 @@ async def listar_campos(
 ):
     await papel(sessao, organizacao_id, user.id)
     await buscar(sessao, organizacao_id, conexao_id)
-    return [c for c in await campos(sessao, conexao_id) if c.formula]
+    saida = []
+    for campo in await campos(sessao, conexao_id):
+        if not campo.formula:
+            continue
+        campo.em_uso = await _em_uso(sessao, conexao_id, campo.coluna)
+        saida.append(campo)
+    return saida
 
 
 @router.post("/{conexao_id}/campos", response_model=Campo, status_code=201)
@@ -325,6 +362,7 @@ async def criar_campo(
     )
     sessao.add(campo)
     await sessao.commit()
+    campo.em_uso = 0
     return campo
 
 
@@ -351,6 +389,7 @@ async def ajustar_campo(
     if dados.papel is not None:
         campo.papel = dados.papel
     await sessao.commit()
+    campo.em_uso = await _em_uso(sessao, conexao_id, campo.coluna)
     return campo
 
 
@@ -361,8 +400,23 @@ async def remover_campo(
     campo_id: UUID,
     user: CurrentUser,
     sessao: Sessao,
+    forcar: bool = False,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "apagar campo calculado")
+    campo = await sessao.scalar(
+        select(CampoDb).where(CampoDb.id == campo_id, CampoDb.conexao_id == conexao_id)
+    )
+    if campo is None or not campo.formula:
+        raise HTTPException(404, "campo calculado não encontrado")
+
+    em_uso = await _em_uso(sessao, conexao_id, campo.coluna)
+    if em_uso and not forcar:
+        raise HTTPException(
+            409,
+            f"{em_uso} indicador{'es' if em_uso > 1 else ''} usa"
+            f"{'m' if em_uso > 1 else ''} este campo e vai parar de funcionar",
+        )
+
     resultado = await sessao.execute(
         delete(CampoDb).where(
             CampoDb.id == campo_id,
@@ -457,6 +511,14 @@ async def painel(
     dimensoes = _dimensoes(catalogo, {i.tempo for i in linhas})
     tempo = next((i.tempo for i in linhas if i.tempo), None)
 
+    # Campo calculado que nao fecha aponta para coluna que foi embora na tabela.
+    _, quebrados = derivar(catalogo)
+    avisos = [
+        f"o campo calculado {nome} ficou de fora: a fórmula aponta para uma "
+        "coluna que não existe mais na tabela"
+        for nome in quebrados
+    ]
+
     if not linhas or not conexao.tabela_fato:
         return Painel(
             tabela=conexao.tabela_fato,
@@ -464,6 +526,7 @@ async def painel(
             indicadores=saida,
             dimensoes=dimensoes,
             janelavel=tempo is not None,
+            avisos=avisos,
         )
 
     tabela = conexao.tabela_fato
@@ -482,6 +545,7 @@ async def painel(
             indicadores=saida,
             dimensoes=dimensoes,
             janelavel=tempo is not None,
+            avisos=avisos,
             erro=e.detail,
         )
 
@@ -498,6 +562,7 @@ async def painel(
         indicadores=saida,
         dimensoes=dimensoes,
         janelavel=tempo is not None,
+        avisos=avisos,
     )
 
 

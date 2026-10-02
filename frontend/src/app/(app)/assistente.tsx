@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { falhar, textoDe } from "@/lib/erros";
 import {
   api,
+  Conflito,
   type Campo,
   type Conexao,
   type Grafico,
@@ -110,6 +111,10 @@ export default function Assistente({
   const [aviso, setAviso] = useState<Aviso | null>(null);
   const [testando, setTestando] = useState(false);
   const [descartando, setDescartando] = useState(false);
+  const [conflito, setConflito] = useState<{
+    nome: string;
+    texto: string;
+  } | null>(null);
   const descartandoAgora = useRef(false);
 
   function irPara(alvo: Etapa) {
@@ -166,6 +171,7 @@ export default function Assistente({
     setVisitados([0]);
     setTestando(false);
     setDescartando(false);
+    setConflito(null);
     setDescartados([]);
     if (!conexao) {
       setEtapa("credenciais");
@@ -281,6 +287,8 @@ export default function Assistente({
       setAtual(nova);
       setForm(credenciaisDe(nova));
       setMudou(true);
+      if (edicao)
+        toast.success("Conexão atualizada. Confira as tabelas abaixo.");
       irPara("tabela");
     } catch (err) {
       if (!atual && nova) await descartar(nova.id);
@@ -458,17 +466,22 @@ export default function Assistente({
     }
   }
 
-  async function removerIndicador(indicador: Indicador) {
+  async function removerIndicador(indicador: Indicador, forcar = false) {
     if (!atual) return;
     const antes = indicadores;
     setIndicadores((lista) => lista.filter((i) => i.id !== indicador.id));
     try {
-      await api<void>(`${base}/${atual.id}/indicadores/${indicador.id}`, {
-        method: "DELETE",
-      });
+      await api<void>(
+        `${base}/${atual.id}/indicadores/${indicador.id}${forcar ? "?forcar=1" : ""}`,
+        { method: "DELETE" },
+      );
     } catch (e) {
-      falhar(e);
       setIndicadores(antes);
+      if (e instanceof Conflito) {
+        setConflito({ nome: indicador.nome, texto: e.message });
+        return;
+      }
+      falhar(e);
     }
   }
 
@@ -509,6 +522,8 @@ export default function Assistente({
     }
     setDescartando(true);
   }
+
+  const reeditando = editar && atual?.etapa === "pronta";
 
   async function sairDescartando() {
     if (descartandoAgora.current) return;
@@ -558,6 +573,13 @@ export default function Assistente({
           </div>
 
           <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-5">
+            {reeditando && (
+              <p className="text-muted-foreground rounded-lg border border-dashed p-3 text-xs">
+                Você está reeditando uma conexão já pronta. Se seguir até o fim,
+                ela continua pronta e com os mesmos indicadores.
+              </p>
+            )}
+
             <RecadoAlerta
               recado={
                 aviso
@@ -640,6 +662,8 @@ export default function Assistente({
                 onTrocarColuna={trocarColuna}
                 onTrocarGrafico={trocarGrafico}
                 onRemover={removerIndicador}
+                conflito={conflito}
+                onFecharConflito={() => setConflito(null)}
                 onCriar={criarIndicador}
                 onFechar={pedirFechar}
                 onConcluir={concluir}

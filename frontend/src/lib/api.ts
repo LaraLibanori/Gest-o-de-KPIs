@@ -8,6 +8,11 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const PRAZO = 15000;
 const PRAZO_LLM = 60000;
 
+// Conflito: apagar ou mexer nisso quebraria algo que ja esta em uso.
+export class Conflito extends Error {
+  readonly status = 409;
+}
+
 export async function api<T>(
   path: string,
   init?: RequestInit & { llm?: boolean },
@@ -36,6 +41,8 @@ export async function api<T>(
     throw new Error("o servidor não respondeu, tente de novo");
   }
 
+  // 409 e conflito de estado: a tela precisa perguntar, nao só mostrar erro.
+  if (res.status === 409) throw new Conflito(await mensagem(res));
   if (!res.ok) throw new Error(await mensagem(res));
 
   return res.status === 204 ? (undefined as T) : res.json();
@@ -125,6 +132,7 @@ export type Campo = {
   papel: PapelCampo;
   rotulo: string | null;
   formula?: string | null;
+  em_uso?: number;
   confirmado: boolean;
   ordem: number;
 };
@@ -299,4 +307,5 @@ export type Painel = {
   dimensoes: Dimensao[];
   janelavel: boolean;
   erro: string | null;
+  avisos?: string[];
 };

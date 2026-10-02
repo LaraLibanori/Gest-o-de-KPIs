@@ -185,6 +185,8 @@ class Campo(BaseModel):
     formula: str | None = None
     confirmado: bool
     ordem: int
+    # Quantos indicadores apontam para esta coluna: apagar pode quebrar o painel.
+    em_uso: int = 0
 
 
 class CampoCalculadoIn(BaseModel):
@@ -310,6 +312,7 @@ class Painel(BaseModel):
     # nao teria efeito e a interface esconde o controle.
     janelavel: bool = True
     erro: str | None = None
+    avisos: list[str] = []
 
 
 class SugestaoGrafico(BaseModel):

@@ -194,6 +194,8 @@ export default function PassoIndicadores({
   onTrocarColuna,
   onTrocarGrafico,
   onRemover,
+  conflito,
+  onFecharConflito,
   onCriar,
   rotuloCancelar,
   onVoltar,
@@ -206,7 +208,9 @@ export default function PassoIndicadores({
   ocupado: boolean;
   onTrocarColuna: (indicador: Indicador, coluna: string | null) => void;
   onTrocarGrafico: (indicador: Indicador, grafico: Grafico) => void;
-  onRemover: (indicador: Indicador) => void;
+  onRemover: (indicador: Indicador, forcar?: boolean) => void;
+  conflito: { nome: string; texto: string } | null;
+  onFecharConflito: () => void;
   onCriar: (novo: IndicadorNovo) => Promise<void>;
   rotuloCancelar: string;
   onVoltar: () => void;
@@ -350,6 +354,23 @@ export default function PassoIndicadores({
           Concluir
         </Button>
       </div>
+
+      <Confirmar
+        aberto={conflito !== null}
+        titulo={`Remover ${conflito?.nome ?? ""} mesmo assim?`}
+        descricao={conflito?.texto ?? ""}
+        acao="Remover assim mesmo"
+        fecharAoConfirmar={false}
+        onConfirmar={() => {
+          if (conflito)
+            onRemover(
+              indicadores.find((i) => i.nome === conflito.nome)!,
+              true,
+            );
+          onFecharConflito();
+        }}
+        onFechar={onFecharConflito}
+      />
 
       <Confirmar
         aberto={aRemover !== null}
