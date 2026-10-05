@@ -44,9 +44,11 @@ const VAZIO: Dados = { nome: "", rotulo: "", formula: "", papel: "metrica" };
 export default function CamposCalculados({
   base,
   colunas,
+  aoMudar,
 }: {
   base: string;
   colunas: Campo[];
+  aoMudar: () => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const [lista, setLista] = useState<Campo[]>([]);
@@ -81,6 +83,7 @@ export default function CamposCalculados({
       });
       setDados(VAZIO);
       await carregar();
+      aoMudar();
       toast.success("campo criado");
     } catch (e) {
       setErro(e instanceof Error ? e.message : "não foi possível criar");
@@ -96,6 +99,7 @@ export default function CamposCalculados({
         method: "DELETE",
       });
       await carregar();
+      aoMudar();
       toast.success("campo apagado");
     } catch (e) {
       // 409 significa que indicador depende do campo: perguntar antes de quebrar.

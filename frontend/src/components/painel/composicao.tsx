@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { Cell, Pie, PieChart } from "recharts";
 import {
   api,
   type Composicao,
+  type Quebra,
   type Dimensao,
   type IndicadorCalculado,
 } from "@/lib/api";
@@ -19,8 +21,110 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const NIVEIS = new Set(["media", "minimo", "maximo"]);
+
+function Pizza({
+  pontos,
+  total,
+  nome,
+}: {
+  pontos: Quebra[];
+  total: number;
+  nome: string;
+}) {
+  const fatias = pontos.filter((p) => (p.valor ?? 0) > 0);
+  const cor = (i: number) => `var(--chart-${(i % 5) + 1})`;
+  return (
+    <div className="space-y-3">
+      <ChartContainer
+        config={{ valor: { label: nome } }}
+        className="mx-auto aspect-square max-h-56"
+      >
+        <PieChart>
+          <ChartTooltip
+            content={<ChartTooltipContent nameKey="rotulo" hideLabel />}
+          />
+          <Pie
+            data={fatias}
+            dataKey="valor"
+            nameKey="rotulo"
+            innerRadius={50}
+            strokeWidth={2}
+            isAnimationActive={false}
+          >
+            {fatias.map((p, i) => (
+              <Cell key={p.rotulo} fill={cor(i)} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ChartContainer>
+      <ul className="grid gap-1 text-xs">
+        {fatias.map((p, i) => (
+          <li key={p.rotulo} className="flex items-center gap-2">
+            <span
+              className="size-2.5 shrink-0 rounded-sm"
+              style={{ background: cor(i) }}
+            />
+            <span className="truncate">{p.rotulo}</span>
+            <span className="text-muted-foreground ml-auto tabular-nums">
+              {curto(p.valor as number)}
+              {total > 0 &&
+                ` · ${(((p.valor as number) / total) * 100).toFixed(0)}%`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Tabela({ pontos, total }: { pontos: Quebra[]; total: number }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Grupo</TableHead>
+          <TableHead className="text-right">Valor</TableHead>
+          {total > 0 && <TableHead className="text-right">Do total</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {pontos.map((p) => (
+          <TableRow key={p.rotulo}>
+            <TableCell className="max-w-40 truncate">{p.rotulo}</TableCell>
+            <TableCell className="text-right tabular-nums">
+              {cheio(p.valor as number)}
+            </TableCell>
+            {total > 0 && (
+              <TableCell className="text-muted-foreground text-right tabular-nums">
+                {(((p.valor as number) / total) * 100)
+                  .toFixed(1)
+                  .replace(".", ",")}
+                %
+              </TableCell>
+            )}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+export type Forma = "barra" | "pizza" | "tabela";
 
 export default function Composicao({
   base,
@@ -28,14 +132,21 @@ export default function Composicao({
   dimensoes,
   janela,
   rotuloDe,
+  forma = "barra",
 }: {
   base: string;
   indicador: IndicadorCalculado;
   dimensoes: Dimensao[];
   janela: string;
   rotuloDe: (coluna: string | null) => string;
+  forma?: Forma;
 }) {
-  const [coluna, setColuna] = useState<string>(dimensoes[0]?.coluna ?? "");
+  const [escolhida, setColuna] = useState<string>("");
+  const preferida =
+    dimensoes.find((d) => d.coluna === indicador.dimensao) ?? dimensoes[0];
+  const coluna = dimensoes.some((d) => d.coluna === escolhida)
+    ? escolhida
+    : (preferida?.coluna ?? "");
   const [dados, setDados] = useState<Composicao | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -47,6 +158,7 @@ export default function Composicao({
     setCarregando(true);
     setErro(null);
     setAberto(null);
+    setDados(null);
     api<Composicao>(
       `${base}/composicao?indicador=${indicador.id}&dimensao=${encodeURIComponent(coluna)}&janela=${janela}`,
     )
@@ -70,7 +182,7 @@ export default function Composicao({
   const somavel = !NIVEIS.has(indicador.agregacao);
   const pontos = (dados?.pontos ?? []).filter((p) => p.valor !== null);
   const maior = Math.max(...pontos.map((p) => p.valor as number), 0);
-  const total = pontos.reduce((s, p) => s + (p.valor as number), 0);
+  const total = somavel ? (dados?.total ?? 0) : 0;
 
   if (dimensoes.length === 0)
     return (
@@ -109,6 +221,10 @@ export default function Composicao({
         <p className="text-muted-foreground py-6 text-center text-sm">
           Sem dados neste período
         </p>
+      ) : forma === "pizza" ? (
+        <Pizza pontos={pontos} total={total} nome={indicador.nome} />
+      ) : forma === "tabela" ? (
+        <Tabela pontos={pontos} total={total} />
       ) : (
         <ul className="space-y-1.5">
           {pontos.map((p) => {
@@ -134,25 +250,34 @@ export default function Composicao({
                   />
                   <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
                     {curto(valor)}
-                    <span className="ml-1 opacity-70">
-                      {doTotal.toFixed(0)}%
-                    </span>
+                    {total > 0 && (
+                      <span className="ml-1 opacity-70">
+                        {doTotal.toFixed(0)}%
+                      </span>
+                    )}
                   </span>
                 </button>
                 {escolhido && (
-                  <dl className="text-muted-foreground animate-in fade-in grid grid-cols-3 gap-2 px-1 pt-1.5 pb-1 text-xs">
+                  <dl
+                    className={cn(
+                      "text-muted-foreground animate-in fade-in grid gap-2 px-1 pt-1.5 pb-1 text-xs",
+                      total > 0 ? "grid-cols-3" : "grid-cols-2",
+                    )}
+                  >
                     <div>
                       <dt>Valor</dt>
                       <dd className="text-foreground tabular-nums">
                         {cheio(valor)}
                       </dd>
                     </div>
-                    <div>
-                      <dt>Do total</dt>
-                      <dd className="text-foreground tabular-nums">
-                        {doTotal.toFixed(1).replace(".", ",")}%
-                      </dd>
-                    </div>
+                    {total > 0 && (
+                      <div>
+                        <dt>Do total</dt>
+                        <dd className="text-foreground tabular-nums">
+                          {doTotal.toFixed(1).replace(".", ",")}%
+                        </dd>
+                      </div>
+                    )}
                     <div>
                       <dt>Da maior</dt>
                       <dd className="text-foreground tabular-nums">
@@ -170,7 +295,7 @@ export default function Composicao({
       {dados && pontos.length > 0 && somavel && (
         <p className="text-muted-foreground text-xs">
           Top {pontos.length}
-          {dados.total !== null && <> · {cheio(dados.total)} no período</>}
+          {total > 0 && <> · {cheio(total)} no período</>}
         </p>
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -16,11 +16,12 @@ import {
 } from "@/lib/api";
 import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
-import Composicao from "@/components/painel/composicao";
+import Destaque from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
-import Evolucao from "@/components/painel/evolucao";
 import Tile from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
+import Confirmar from "@/components/confirmar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -41,9 +42,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizacao } from "../../contexto";
 
-const SEM_ZERO = new Set(["media", "minimo", "maximo"]);
-const SOMAVEIS = new Set(["soma", "contagem", "distintos"]);
-
 export default function DetalheDoDashboard() {
   const { id } = useParams<{ id: string }>();
   const roteador = useRouter();
@@ -54,20 +52,27 @@ export default function DetalheDoDashboard() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [escolhendo, setEscolhendo] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [apagando, setApagando] = useState(false);
+  const pedido = useRef(0);
 
   const base = aberta ? `/organizacoes/${aberta.id}/dashboards/${id}` : null;
 
   const carregar = useCallback(async () => {
     if (!base) return;
+    const meu = ++pedido.current;
     setCarregando(true);
     try {
-      setPainel(await api<Dashboard>(`${base}?janela=${janela}`));
+      const novo = await api<Dashboard>(`${base}?janela=${janela}`);
+      if (meu !== pedido.current) return;
+      setPainel(novo);
       setErro(null);
     } catch (e) {
+      if (meu !== pedido.current) return;
       setErro(e instanceof Error ? e.message : "não foi possível carregar");
       falhar(e, "não foi possível carregar o dashboard");
     } finally {
-      setCarregando(false);
+      if (meu === pedido.current) setCarregando(false);
     }
   }, [base, janela]);
 
@@ -75,7 +80,7 @@ export default function DetalheDoDashboard() {
     carregar();
   }, [carregar]);
 
-  const indicadores = painel?.indicadores ?? [];
+  const indicadores = useMemo(() => painel?.indicadores ?? [], [painel]);
   const bons = useMemo(
     () => indicadores.filter((i) => i.erro === null && i.valor !== null),
     [indicadores],
@@ -86,26 +91,19 @@ export default function DetalheDoDashboard() {
   }, [bons, selecionado]);
 
   const [catalogo, setCatalogo] = useState<Campo[]>([]);
-  const [dimensoes, setDimensoes] = useState<Dimensao[]>([]);
   const conexaoDoDestaque = destaque?.conexao_id ?? null;
 
   useEffect(() => {
-    if (!aberta || !conexaoDoDestaque) {
-      setCatalogo([]);
-      setDimensoes([]);
-      return;
-    }
-    (async () => {
-      try {
-        setCatalogo(
-          await api<Campo[]>(
-            `/organizacoes/${aberta.id}/conexoes/${conexaoDoDestaque}/catalogo`,
-          ),
-        );
-      } catch {
-        setCatalogo([]);
-      }
-    })();
+    if (!aberta || !conexaoDoDestaque) return;
+    let vivo = true;
+    api<Campo[]>(
+      `/organizacoes/${aberta.id}/conexoes/${conexaoDoDestaque}/catalogo`,
+    )
+      .then((r) => vivo && setCatalogo(r))
+      .catch(() => vivo && setCatalogo([]));
+    return () => {
+      vivo = false;
+    };
   }, [aberta, conexaoDoDestaque]);
 
   const tempos = useMemo(
@@ -113,18 +111,19 @@ export default function DetalheDoDashboard() {
     [indicadores],
   );
 
-  useEffect(() => {
-    setDimensoes(
+  const dimensoes: Dimensao[] = useMemo(
+    () =>
       catalogo
         .filter(
           (c) =>
             c.papel === "dimensao" &&
             (c.tipo === "text" || c.tipo.includes("char")) &&
+            !/^id$|^id_|_id$/i.test(c.coluna) &&
             !tempos.has(c.coluna),
         )
         .map((c) => ({ coluna: c.coluna, rotulo: c.rotulo ?? c.coluna })),
-    );
-  }, [catalogo, tempos]);
+    [catalogo, tempos],
+  );
 
   const rotulo = useCallback(
     (coluna: string | null) =>
@@ -134,16 +133,20 @@ export default function DetalheDoDashboard() {
   );
 
   async function trocar(escolhidos: string[]) {
-    if (!base) return;
+    if (!base || salvando) return;
+    setSalvando(true);
     try {
       await api<Dashboard>(`${base}/indicadores`, {
         method: "PUT",
         body: JSON.stringify({ indicadores: escolhidos }),
       });
+      setEscolhendo(false);
       await carregar();
       toast.success("indicadores atualizados");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "não foi possível salvar");
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -192,7 +195,7 @@ export default function DetalheDoDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={apagar}
+              onClick={() => setApagando(true)}
               disabled={!painel}
               aria-label="Apagar dashboard"
             >
@@ -203,9 +206,9 @@ export default function DetalheDoDashboard() {
       />
 
       {erro && (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-          {erro}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{erro}</AlertDescription>
+        </Alert>
       )}
 
       {carregando && !painel ? (
@@ -214,7 +217,7 @@ export default function DetalheDoDashboard() {
             <Skeleton key={i} className="h-36 w-full rounded-xl" />
           ))}
         </div>
-      ) : indicadores.length === 0 ? (
+      ) : !painel ? null : indicadores.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -247,42 +250,14 @@ export default function DetalheDoDashboard() {
           </div>
 
           {destaque && (
-            <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-              <section className="bg-card text-card-foreground rounded-xl border p-4">
-                <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-sm font-medium">{destaque.nome}</h2>
-                  <p className="text-muted-foreground text-xs">
-                    {destaque.variacao === null
-                      ? "sem período anterior"
-                      : `variação de ${destaque.variacao.toFixed(1).replace(".", ",")}%`}
-                  </p>
-                </header>
-                <Evolucao
-                  pontos={destaque.serie}
-                  rotulo={destaque.nome}
-                  total={
-                    SOMAVEIS.has(destaque.agregacao) ? destaque.valor : null
-                  }
-                  zero={!SEM_ZERO.has(destaque.agregacao)}
-                />
-              </section>
-
-              <section className="bg-card text-card-foreground rounded-xl border p-4">
-                <header className="mb-3">
-                  <h2 className="text-sm font-medium">Composição</h2>
-                  <p className="text-muted-foreground text-xs">
-                    de {destaque.conexao}
-                  </p>
-                </header>
-                <Composicao
-                  base={`/organizacoes/${aberta?.id ?? ""}/conexoes/${destaque.conexao_id}`}
-                  indicador={destaque}
-                  dimensoes={dimensoes}
-                  janela={janela}
-                  rotuloDe={rotulo}
-                />
-              </section>
-            </div>
+            <Destaque
+              indicador={destaque}
+              base={`/organizacoes/${aberta?.id ?? ""}/conexoes/${destaque.conexao_id}`}
+              dimensoes={dimensoes}
+              janela={janela}
+              rotuloDe={rotulo}
+              origem={destaque.conexao}
+            />
           )}
         </>
       )}
@@ -293,9 +268,18 @@ export default function DetalheDoDashboard() {
           onAbrir={setEscolhendo}
           org={aberta?.id ?? ""}
           jaEscolhidos={indicadores.map((i) => i.id)}
+          salvando={salvando}
           onSalvar={trocar}
         />
       )}
+
+      <Confirmar
+        aberto={apagando}
+        titulo={`Apagar ${painel?.nome ?? "o dashboard"}?`}
+        descricao="Só o dashboard é apagado. Os indicadores e as conexões continuam como estão."
+        onConfirmar={apagar}
+        onFechar={() => setApagando(false)}
+      />
     </Pagina>
   );
 }
@@ -305,12 +289,14 @@ function EscolherIndicadores({
   onAbrir,
   org,
   jaEscolhidos,
+  salvando,
   onSalvar,
 }: {
   aberto: boolean;
   onAbrir: (v: boolean) => void;
   org: string;
   jaEscolhidos: string[];
+  salvando: boolean;
   onSalvar: (ids: string[]) => void;
 }) {
   const [conexoes, setConexoes] = useState<Conexao[]>([]);
@@ -318,16 +304,20 @@ function EscolherIndicadores({
   const [marcados, setMarcados] = useState<string[]>(jaEscolhidos);
   const [carregando, setCarregando] = useState(false);
 
-  useEffect(() => {
-    setMarcados(jaEscolhidos);
-  }, [jaEscolhidos, aberto]);
+  const [visto, setVisto] = useState(false);
+  if (aberto !== visto) {
+    setVisto(aberto);
+    if (aberto) setMarcados(jaEscolhidos);
+  }
 
   useEffect(() => {
     if (!aberto || !org) return;
+    let vivo = true;
     setCarregando(true);
     (async () => {
       try {
         const lista = await api<Conexao[]>(`/organizacoes/${org}/conexoes`);
+        if (!vivo) return;
         setConexoes(lista);
         const pares = await Promise.all(
           lista.map(async (c) => {
@@ -343,11 +333,16 @@ function EscolherIndicadores({
             }
           }),
         );
-        setPorConexao(Object.fromEntries(pares));
+        if (vivo) setPorConexao(Object.fromEntries(pares));
+      } catch (e) {
+        falhar(e, "não foi possível listar as conexões");
       } finally {
-        setCarregando(false);
+        if (vivo) setCarregando(false);
       }
     })();
+    return () => {
+      vivo = false;
+    };
   }, [aberto, org]);
 
   return (
@@ -408,7 +403,9 @@ function EscolherIndicadores({
           <Button variant="outline" onClick={() => onAbrir(false)}>
             Cancelar
           </Button>
-          <Button onClick={() => onSalvar(marcados)}>Salvar</Button>
+          <Button disabled={salvando} onClick={() => onSalvar(marcados)}>
+            Salvar
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

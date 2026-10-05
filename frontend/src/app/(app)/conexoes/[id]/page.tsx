@@ -20,9 +20,8 @@ import {
 import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
 import CamposCalculados from "@/components/painel/campos";
-import Composicao from "@/components/painel/composicao";
+import Destaque from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
-import Evolucao from "@/components/painel/evolucao";
 import Tile from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
@@ -33,21 +32,15 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { paineis } from "@/lib/paineis";
 import { useOrganizacao } from "../../contexto";
 
 const JANELA_INICIAL: Janela = "30d";
-const SEM_ZERO = new Set(["media", "minimo", "maximo"]);
-const SOMAVEIS = new Set(["soma", "contagem", "distintos"]);
 
-// O custo esta na ida ao banco do cliente, nao no tamanho da resposta: um
-// painel pesa poucos KB. Por isso o cache e do navegador, e o servidor fica
-// fora. Vive fora do componente para sobreviver a navegacao.
+// Cache do navegador: o custo esta na ida ao banco do cliente, nao no tamanho da resposta.
 const FRESCO = 60_000;
-const cache = new Map<
-  string,
-  { rapido: Painel; completo?: Painel; em: number }
->();
 
 export default function PainelDaConexao() {
   const { id } = useParams<{ id: string }>();
@@ -93,7 +86,7 @@ export default function PainelDaConexao() {
       if (!base) return;
       const meu = ++pedido.current;
       const chave = `${id}:${alvo}`;
-      const guardado = cache.get(chave);
+      const guardado = paineis.get(chave);
 
       // Mostra o que tem sem esperar e revalida por tras, sem piscar a tela.
       if (guardado && !forcar) {
@@ -101,7 +94,7 @@ export default function PainelDaConexao() {
         setCarregando(false);
         setCarregandoSerie(!guardado.completo);
         pintou.current = true;
-        if (Date.now() - guardado.em < FRESCO) return;
+        if (guardado.completo && Date.now() - guardado.em < FRESCO) return;
       } else {
         setCarregando(true);
         setCarregandoSerie(false);
@@ -109,8 +102,7 @@ export default function PainelDaConexao() {
       }
 
       try {
-        // Atualizar recarrega o catalogo tambem: quem criou coluna nova no banco
-        // precisa ver a coluna sem sair da tela.
+        // Atualizar recarrega o catalogo: coluna nova no banco precisa aparecer.
         if (!contexto.current || forcar) {
           const [lista, catalogo] = await Promise.all([
             api<Conexao[]>(base),
@@ -131,7 +123,7 @@ export default function PainelDaConexao() {
           pintou.current = true;
           setCarregando(false);
           setCarregandoSerie(true);
-          cache.set(chave, { rapido, em: Date.now() });
+          paineis.set(chave, { rapido, em: Date.now() });
         }
 
         const completo = await api<Painel>(
@@ -139,8 +131,8 @@ export default function PainelDaConexao() {
         );
         if (meu !== pedido.current) return;
         setPainel(completo);
-        const anterior = cache.get(chave);
-        cache.set(chave, {
+        const anterior = paineis.get(chave);
+        paineis.set(chave, {
           rapido: anterior?.rapido ?? completo,
           completo,
           em: Date.now(),
@@ -169,7 +161,7 @@ export default function PainelDaConexao() {
 
   useEffect(() => {
     if (!carregandoOrg) buscar(janela);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- troca de janela chama buscar direto
   }, [carregandoOrg, buscar]);
 
   // Indicador marcado nao sobrevive a troca de periodo.
@@ -217,7 +209,14 @@ export default function PainelDaConexao() {
         acoes={
           <>
             {base && (
-              <CamposCalculados base={`${base}/${id}`} colunas={campos} />
+              <CamposCalculados
+                base={`${base}/${id}`}
+                colunas={campos}
+                aoMudar={() => {
+                  paineis.clear();
+                  buscar(janela, true);
+                }}
+              />
             )}
             <ControleJanela
               janela={janela}
@@ -242,24 +241,21 @@ export default function PainelDaConexao() {
       />
 
       {(erro ?? painel?.erro) && (
-        <p className="text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-4 text-sm">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-          {erro ?? painel?.erro}
-        </p>
+        <Alert variant="destructive">
+          <TriangleAlert />
+          <AlertDescription>{erro ?? painel?.erro}</AlertDescription>
+        </Alert>
       )}
 
       {!!painel?.avisos?.length && (
-        <ul className="space-y-1.5">
+        <div className="space-y-2">
           {painel.avisos.map((a) => (
-            <li
-              key={a}
-              className="text-muted-foreground flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm"
-            >
-              <Info className="mt-0.5 size-4 shrink-0" />
-              {a}
-            </li>
+            <Alert key={a}>
+              <Info />
+              <AlertDescription>{a}</AlertDescription>
+            </Alert>
           ))}
-        </ul>
+        </div>
       )}
 
       {carregando && !painel ? (
@@ -268,7 +264,7 @@ export default function PainelDaConexao() {
             <Skeleton key={i} className="h-36 w-full rounded-xl" />
           ))}
         </div>
-      ) : erro ? null : todos.length === 0 ? (
+      ) : !painel ? null : todos.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -286,10 +282,13 @@ export default function PainelDaConexao() {
         <>
           {comFalha.length === indicadores.length &&
             indicadores.length === 0 && (
-              <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-                Nenhum dos {todos.length} indicadores deste painel pôde ser
-                calculado. O erro de cada um está no cartão acima.
-              </p>
+              <Alert>
+                <Info />
+                <AlertDescription>
+                  Nenhum dos {todos.length} indicadores deste painel pôde ser
+                  calculado. O erro de cada um está no cartão acima.
+                </AlertDescription>
+              </Alert>
             )}
 
           <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -305,48 +304,14 @@ export default function PainelDaConexao() {
           </div>
 
           {destaque && base && (
-            <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-              <section className="bg-card text-card-foreground rounded-xl border p-4">
-                <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="text-sm font-medium">{destaque.nome}</h2>
-                  <p className="text-muted-foreground text-xs">
-                    {rotulo(destaque.coluna)} ·{" "}
-                    {destaque.variacao === null
-                      ? "sem período anterior"
-                      : `variação de ${destaque.variacao.toFixed(1).replace(".", ",")}%`}
-                  </p>
-                </header>
-                <Evolucao
-                  pontos={destaque.serie}
-                  rotulo={destaque.nome}
-                  total={
-                    SOMAVEIS.has(destaque.agregacao) ? destaque.valor : null
-                  }
-                  zero={!SEM_ZERO.has(destaque.agregacao)}
-                  carregando={carregandoSerie}
-                />
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Passe o mouse ou use as setas do teclado para ver o valor de
-                  cada período.
-                </p>
-              </section>
-
-              <section className="bg-card text-card-foreground rounded-xl border p-4">
-                <header className="mb-3">
-                  <h2 className="text-sm font-medium">Composição</h2>
-                  <p className="text-muted-foreground text-xs">
-                    Como {destaque.nome.toLowerCase()} se reparte
-                  </p>
-                </header>
-                <Composicao
-                  base={`${base}/${id}`}
-                  indicador={destaque}
-                  dimensoes={painel?.dimensoes ?? []}
-                  janela={janela}
-                  rotuloDe={rotulo}
-                />
-              </section>
-            </div>
+            <Destaque
+              indicador={destaque}
+              base={`${base}/${id}`}
+              dimensoes={painel?.dimensoes ?? []}
+              janela={janela}
+              rotuloDe={rotulo}
+              carregandoSerie={carregandoSerie}
+            />
           )}
         </>
       )}
