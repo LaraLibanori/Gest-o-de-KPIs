@@ -16,7 +16,8 @@ from ..indicadores import (
     sugerir_grafico,
 )
 from ..introspeccao import TEMPO, identificador
-from ..llm import sugerir_graficos
+from ..limite_llm import reservar
+from ..llm import disponivel, sugerir_graficos
 from ..models import Campo as CampoDb
 from ..models import Dashboard as DashboardDb
 from ..models import DashboardIndicador as VinculoDb
@@ -447,6 +448,8 @@ async def sugerir_formas(
             .order_by(IndicadorDb.ordem)
         )
     )
+    if disponivel():
+        await reservar(sessao, user)
     escolhas = await sugerir_graficos(
         [
             {

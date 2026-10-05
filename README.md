@@ -129,6 +129,8 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `NVIDIA_API_KEY`                | sugestão de rótulo, pela NVIDIA (gratuita) |
 | backend  | `OPENROUTER_API_KEY`            | sugestão de rótulo no catálogo |
 | backend  | `GROQ_API_KEY`                  | o mesmo, como segunda opção |
+| backend  | `LLM_LIMITE_USUARIO`            | sugestões por pessoa por dia (padrão 20) |
+| backend  | `LLM_LIMITE_TOTAL`              | sugestões do sistema por dia (padrão 200) |
 
 As duas últimas não vão para a Vercel.
 

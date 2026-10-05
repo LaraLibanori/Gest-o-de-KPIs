@@ -13,6 +13,9 @@ ADMIN = os.environ.get(
     "MIGRATIONS_DATABASE_URL",
     "postgresql://postgres:postgres@localhost:55432/postgres",
 )
+# A fixture apaga os schemas: nunca aponta para um banco que nao seja o local.
+if not any(h in ADMIN for h in ("@localhost:", "@127.0.0.1:")):
+    raise RuntimeError("os testes só rodam contra um banco local")
 SENHA_APP = os.environ.get("KPI_APP_PASSWORD", "senha-de-teste")
 APP = ADMIN.replace("postgres:postgres@", f"kpi_api:{SENHA_APP}@")
 
@@ -70,6 +73,7 @@ async def admin(banco):
 
 @pytest.fixture
 async def limpar(admin):
+    await admin.execute("delete from uso_llm")
     await admin.execute("delete from organizacoes")
     await admin.execute("delete from auth.users")
 

@@ -6,7 +6,8 @@ from sqlalchemy import select, update
 from ..auth import CurrentUser
 from ..db import Sessao
 from ..introspeccao import ler_catalogo
-from ..llm import sugerir
+from ..limite_llm import reservar
+from ..llm import disponivel, sugerir
 from ..models import Campo as CampoDb
 from ..permissoes import exigir_dono, papel
 from ..schemas import Campo, CampoIn, Sugestao
@@ -73,6 +74,8 @@ async def sugerir_rotulos(
     conexao = await buscar(sessao, organizacao_id, conexao_id)
     campos = await campos_da(sessao, conexao_id)
 
+    if disponivel():
+        await reservar(sessao, user)
     sugestoes = await sugerir(
         [
             {"coluna": c.coluna, "tipo": c.tipo, "cardinalidade": c.cardinalidade}
