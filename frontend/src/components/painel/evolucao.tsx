@@ -1,37 +1,14 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { Quebra } from "@/lib/api";
 import { cheio, curto } from "@/lib/numero";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-
-const L = 720;
-const A = 240;
-const MARGEM = { topo: 16, direita: 16, base: 28, esquerda: 52 };
-const INTERNO_L = L - MARGEM.esquerda - MARGEM.direita;
-const INTERNO_A = A - MARGEM.topo - MARGEM.base;
-
-function escala(valores: number[], zero: boolean) {
-  const maior = Math.max(...valores);
-  const menor = zero ? Math.min(0, ...valores) : Math.min(...valores);
-  const bruto =
-    Math.max(...valores) - Math.min(0, ...valores) || Math.abs(maior) || 1;
-  const folga = bruto * 0.12;
-  const topo = maior + (maior > 0 ? folga : 0);
-  const piso = zero
-    ? Math.min(0, menor - folga)
-    : Math.min(menor - folga, maior * 0.8);
-  const y = (v: number) =>
-    MARGEM.topo + (1 - (v - piso) / (topo - piso || 1)) * INTERNO_A;
-  const tiques: { v: number; y: number }[] = [];
-  const passos = 4;
-  for (let i = 0; i <= passos; i++) {
-    const v = piso + ((topo - piso) * i) / passos;
-    tiques.push({ v, y: y(v) });
-  }
-  return { y, tiques, base: piso };
-}
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 export default function Evolucao({
   pontos,
@@ -46,81 +23,7 @@ export default function Evolucao({
   zero?: boolean;
   carregando?: boolean;
 }) {
-  const [ativo, setAtivo] = useState<number | null>(null);
-  const caixa = useRef<HTMLDivElement>(null);
-
-  const validos = useMemo(
-    () => pontos.filter((p) => p.valor !== null).map((p, n) => ({ ...p, n })),
-    [pontos],
-  );
-
-  const { y, tiques, base } = useMemo(
-    () =>
-      escala(
-        validos.map((p) => p.valor as number),
-        zero,
-      ),
-    [validos, zero],
-  );
-
-  const x = useCallback(
-    (n: number) =>
-      MARGEM.esquerda +
-      (validos.length < 2
-        ? INTERNO_L / 2
-        : (n / (validos.length - 1)) * INTERNO_L),
-    [validos.length],
-  );
-
-  const traco = useMemo(
-    () =>
-      validos
-        .map((p) => `${p.n === 0 ? "M" : "L"}${x(p.n)},${y(p.valor as number)}`)
-        .join(" "),
-    [validos, x, y],
-  );
-
-  const area = useMemo(() => {
-    if (validos.length < 2) return "";
-    const primeiro = validos[0];
-    const ultimo = validos[validos.length - 1];
-    return `${traco} L${x(ultimo.n)},${y(base)} L${x(primeiro.n)},${y(base)} Z`;
-  }, [validos, traco, x, y, base]);
-
-  const mover = useCallback(
-    (clientX: number) => {
-      const caixa_ = caixa.current?.getBoundingClientRect();
-      if (!caixa_ || validos.length === 0) return;
-      const px = ((clientX - caixa_.left) / caixa_.width) * L;
-      let melhor = 0;
-      let menor = Infinity;
-      validos.forEach((p) => {
-        const d = Math.abs(x(p.n) - px);
-        if (d < menor) {
-          menor = d;
-          melhor = p.n;
-        }
-      });
-      setAtivo(melhor);
-    },
-    [caixa, validos, x],
-  );
-
-  const teclado = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (validos.length === 0) return;
-      const salto = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-      if (salto === 0 && e.key !== "Home" && e.key !== "End") return;
-      e.preventDefault();
-      setAtivo((atual) => {
-        if (e.key === "Home") return 0;
-        if (e.key === "End") return validos.length - 1;
-        const base_ = atual === null ? validos.length - 1 : atual;
-        return Math.max(0, Math.min(validos.length - 1, base_ + salto));
-      });
-    },
-    [validos.length],
-  );
+  const validos = pontos.filter((p) => p.valor !== null);
 
   if (validos.length < 2)
     return carregando ? (
@@ -131,156 +34,49 @@ export default function Evolucao({
       </div>
     );
 
-  const ponto = ativo === null ? null : validos[ativo];
-  const anterior =
-    ativo !== null && ativo > 0 ? validos[ativo - 1].valor : null;
-  const mudanca =
-    ponto && anterior !== null && anterior !== 0
-      ? (((ponto.valor as number) - anterior) / Math.abs(anterior)) * 100
-      : null;
-  const anuncio =
-    ponto &&
-    `${rotuloDe(ponto.rotulo)}: ${cheio(ponto.valor as number)}${
-      mudanca !== null
-        ? `, ${mudanca >= 0 ? "alta" : "queda"} de ${Math.abs(mudanca)
-            .toFixed(1)
-            .replace(".", ",")}%`
-        : ""
-    }`;
-
   return (
-    <div ref={caixa} className="relative">
-      <span className="sr-only" aria-live="polite">
-        {anuncio}
-      </span>
-      <svg
-        viewBox={`0 0 ${L} ${A}`}
-        className="h-60 w-full touch-none focus-visible:ring-ring/50 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-        role="application"
-        aria-label={`${rotulo} ao longo do tempo. Use as setas para percorrer os períodos.`}
-        tabIndex={0}
-        onPointerMove={(e) => mover(e.clientX)}
-        onPointerDown={(e) => mover(e.clientX)}
-        onPointerLeave={() => setAtivo(null)}
-        onKeyDown={teclado}
-        onBlur={() => setAtivo(null)}
+    <div>
+      <ChartContainer
+        config={{ valor: { label: rotulo, color: "var(--chart-1)" } }}
+        className="aspect-auto h-60 w-full"
       >
-        <defs>
-          <linearGradient id="preenche" x1="0" y1="0" x2="0" y2="1">
-            <stop
-              offset="0%"
-              stopColor="var(--color-chart-1)"
-              stopOpacity={0.34}
-            />
-            <stop
-              offset="100%"
-              stopColor="var(--color-chart-1)"
-              stopOpacity={0.02}
-            />
-          </linearGradient>
-        </defs>
-
-        {tiques.map((t, i) => (
-          <g key={i}>
-            <line
-              x1={MARGEM.esquerda}
-              x2={L - MARGEM.direita}
-              y1={t.y}
-              y2={t.y}
-              stroke="var(--color-border)"
-              strokeDasharray={i === 0 ? undefined : "3 4"}
-              opacity={0.6}
-            />
-            <text
-              x={MARGEM.esquerda - 8}
-              y={t.y + 4}
-              textAnchor="end"
-              className="fill-muted-foreground text-[10px]"
-            >
-              {curto(t.v)}
-            </text>
-          </g>
-        ))}
-
-        {area && <path d={area} fill="url(#preenche)" />}
-        <path
-          d={traco}
-          fill="none"
-          stroke="var(--color-chart-1)"
-          strokeWidth={2}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-
-        {ponto && (
-          <g>
-            <line
-              x1={x(ponto.n)}
-              x2={x(ponto.n)}
-              y1={MARGEM.topo}
-              y2={A - MARGEM.base}
-              stroke="var(--color-chart-1)"
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              opacity={0.7}
-            />
-            <circle
-              cx={x(ponto.n)}
-              cy={y(ponto.valor as number)}
-              r={5}
-              fill="var(--color-chart-1)"
-              stroke="var(--color-background)"
-              strokeWidth={2}
-            />
-          </g>
-        )}
-
-        <text
-          x={MARGEM.esquerda}
-          y={A - 8}
-          className="fill-muted-foreground text-[10px]"
-        >
-          {rotuloDe(pontos[0]?.rotulo)}
-        </text>
-        <text
-          x={L - MARGEM.direita}
-          y={A - 8}
-          textAnchor="end"
-          className="fill-muted-foreground text-[10px]"
-        >
-          {rotuloDe(pontos[pontos.length - 1]?.rotulo)}
-        </text>
-      </svg>
-
-      {ponto && (
-        <div
-          className={cn(
-            "bg-popover text-popover-foreground pointer-events-none absolute top-2 z-10 w-44 rounded-lg border p-2.5 shadow-lg",
-            (ativo ?? 0) > validos.length / 2 ? "left-2" : "right-2",
-          )}
-        >
-          <p className="text-muted-foreground text-[11px]">
-            {rotuloDe(ponto.rotulo)}
-          </p>
-          <p className="mt-0.5 text-lg leading-none font-semibold tabular-nums">
-            {curto(ponto.valor as number)}
-          </p>
-          <p className="text-muted-foreground mt-1 text-[11px] tabular-nums">
-            {cheio(ponto.valor as number)}
-            {mudanca !== null && (
-              <span
-                className={cn(
-                  "ml-1 font-medium",
-                  mudanca >= 0 ? "text-emerald-500" : "text-rose-500",
-                )}
-              >
-                {mudanca >= 0 ? "+" : ""}
-                {mudanca.toFixed(1).replace(".", ",")}%
-              </span>
-            )}
-          </p>
-        </div>
-      )}
+        <AreaChart data={validos} margin={{ left: 4, right: 12, top: 8 }}>
+          <CartesianGrid vertical={false} strokeDasharray="3 4" />
+          <XAxis
+            dataKey="rotulo"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            minTickGap={48}
+            tickFormatter={rotuloDe}
+          />
+          <YAxis
+            width={48}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={curto}
+            domain={zero ? [0, "auto"] : ["auto", "auto"]}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                labelFormatter={(v) => rotuloDe(String(v))}
+                formatter={(v) => cheio(Number(v))}
+                hideIndicator
+              />
+            }
+          />
+          <Area
+            dataKey="valor"
+            type="monotone"
+            stroke="var(--color-valor)"
+            fill="var(--color-valor)"
+            fillOpacity={0.15}
+            strokeWidth={2}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ChartContainer>
 
       {total !== null && (
         <p className="text-muted-foreground mt-1 text-xs">
@@ -294,8 +90,7 @@ export default function Evolucao({
   );
 }
 
-function rotuloDe(iso: string | undefined): string {
-  if (!iso) return "";
+function rotuloDe(iso: string): string {
   const data = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(data.getTime())) return iso;
   return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });

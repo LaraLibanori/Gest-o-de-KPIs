@@ -1,6 +1,8 @@
 "use client";
 
+import { Area, AreaChart, YAxis } from "recharts";
 import type { Quebra } from "@/lib/api";
+import { ChartContainer } from "@/components/ui/chart";
 
 export default function Sparkline({
   pontos,
@@ -9,44 +11,36 @@ export default function Sparkline({
   pontos: Quebra[];
   className?: string;
 }) {
-  const valores = pontos
-    .map((p) => p.valor)
-    .filter((v): v is number => v !== null);
-  if (valores.length < 2) return <div className={className} aria-hidden />;
+  const validos = pontos.filter((p) => p.valor !== null);
+  if (validos.length < 2) return <div className={className} aria-hidden />;
 
-  const menor = Math.min(...valores);
-  const faixa =
-    Math.max(...valores) - menor || Math.abs(Math.max(...valores)) || 1;
-  const ultimo = valores[valores.length - 1];
-  const primeiro = valores[0];
-  const subiu = ultimo >= primeiro;
-
-  const L = 100;
-  const A = 32;
-  const x = (i: number) => (i / (valores.length - 1)) * L;
-  const y = (v: number) => A - 2 - ((v - menor) / faixa) * (A - 4);
-
-  const linha = valores.map((v, i) => `${x(i)},${y(v)}`).join(" ");
-  const area = `0,${A} ${linha} ${L},${A}`;
-  const cor = subiu ? "var(--color-chart-1)" : "var(--color-chart-4)";
+  const subiu =
+    (validos[validos.length - 1].valor as number) >=
+    (validos[0].valor as number);
+  const cor = subiu ? "var(--chart-1)" : "var(--chart-4)";
 
   return (
-    <svg
-      viewBox={`0 0 ${L} ${A}`}
-      className={className}
-      preserveAspectRatio="none"
+    <ChartContainer
+      config={{ valor: { color: cor } }}
+      className={`aspect-auto ${className}`}
       aria-hidden
     >
-      <polygon points={area} fill={cor} opacity={0.14} />
-      <polyline
-        points={linha}
-        fill="none"
-        stroke={cor}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
+      <AreaChart
+        data={validos}
+        margin={{ top: 2, bottom: 2, left: 0, right: 0 }}
+      >
+        <YAxis hide domain={["dataMin", "dataMax"]} />
+        <Area
+          dataKey="valor"
+          type="monotone"
+          stroke="var(--color-valor)"
+          fill="var(--color-valor)"
+          fillOpacity={0.14}
+          strokeWidth={1.5}
+          dot={false}
+          isAnimationActive={false}
+        />
+      </AreaChart>
+    </ChartContainer>
   );
 }
