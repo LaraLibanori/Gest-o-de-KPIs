@@ -21,5 +21,4 @@ rodado à mão.
 
 `SUPABASE_URL` e `DATABASE_URL` ficam no `backend/.env`.
 
-`FRONTEND_ORIGIN` — origem liberada no CORS. Sem ela o CORS nem é ligado, o que
-serve para a Vercel, onde os dois ficam no mesmo domínio.
+O backend não tem CORS: só o servidor do Next o chama.

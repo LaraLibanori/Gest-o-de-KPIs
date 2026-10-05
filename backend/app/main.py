@@ -1,5 +1,4 @@
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 
@@ -47,18 +46,6 @@ async def falha(request: Request, erro: Exception):
         headers={"X-Request-Id": pedido},
     )
 
-
-# Na Vercel os dois ficam no mesmo domínio. CORS só é preciso no local.
-frontend_origin = os.environ.get("FRONTEND_ORIGIN")
-if frontend_origin:
-    from fastapi.middleware.cors import CORSMiddleware
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[frontend_origin],
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
-    )
 
 app.include_router(perfil.router)
 app.include_router(organizacoes.router)

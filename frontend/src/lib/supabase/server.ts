@@ -5,18 +5,18 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: (list) => {
           try {
             list.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              cookieStore.set(name, value, { ...options, httpOnly: true }),
             );
           } catch {
-            // Server Component não deixa escrever cookie; quem renova é o cliente.
+            // Server Component não escreve cookie; o proxy renova a sessão.
           }
         },
       },

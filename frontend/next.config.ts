@@ -1,10 +1,5 @@
 import type { NextConfig } from "next";
 
-const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-
-// No local o backend fica em outra porta; em produção /api é a mesma origem.
-const api = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 // Sem middleware não há nonce; ainda assim script-src 'self' barra script de fora.
 const politica = [
   "default-src 'self'",
@@ -12,7 +7,7 @@ const politica = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src ${["'self'", supabase, api].filter(Boolean).join(" ")}`,
+  "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

@@ -22,14 +22,15 @@ a definição dos indicadores e o painel que calcula cada um deles.
 
 ## Como funciona
 
-O login é feito pelo Supabase Auth, direto no navegador. O front guarda a
-sessão em cookie e manda o token em toda chamada para a API. O FastAPI confere
-esse token e só então consulta o banco.
+O login passa pelo servidor do Next, que fala com o Supabase Auth e guarda a
+sessão em cookie `httpOnly`: o navegador nunca vê o token. As chamadas vão para
+`/servidor/*`, onde o Next anexa o token e repassa à API. O FastAPI confere esse
+token e só então consulta o banco.
 
 ```
-Next.js  ──login──>  Supabase Auth
-   │
-   └──/api + token──>  FastAPI  ──SQL──>  Postgres (Supabase)
+Navegador ──cookie──> Next.js ──login──> Supabase Auth
+                         │
+                         └──token──> FastAPI ──SQL──> Postgres (Supabase)
 ```
 
 Os dois sobem juntos na Vercel, no mesmo domínio: `/api/*` vai para o backend
@@ -117,8 +118,8 @@ Os dois últimos terminam conferindo as rotas principais.
 
 | Onde     | Variável                        | Para quê                            |
 |----------|---------------------------------|-------------------------------------|
-| frontend | `NEXT_PUBLIC_SUPABASE_URL`      | URL do projeto no Supabase          |
-| frontend | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave pública, usada no login       |
+| frontend | `SUPABASE_URL`                  | URL do projeto no Supabase          |
+| frontend | `SUPABASE_ANON_KEY`             | chave anônima, usada no login       |
 | backend  | `SUPABASE_URL`                  | usada para validar o token          |
 | backend  | `DATABASE_URL`                  | conexão da API                      |
 | backend  | `APP_SECRET_KEY`                | cifra a senha de cada conexão       |

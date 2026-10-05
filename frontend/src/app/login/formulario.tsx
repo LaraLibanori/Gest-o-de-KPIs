@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Building2, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,16 +44,24 @@ export default function Formulario() {
     setErro(null);
     setCarregando(true);
 
-    const supabase = createClient();
-    const { error } =
-      modo === "entrar"
-        ? await supabase.auth.signInWithPassword({ email, password: senha })
-        : await supabase.auth.signUp({ email, password: senha });
+    let resposta: Response;
+    try {
+      resposta = await fetch("/auth/entrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modo, email, senha }),
+      });
+    } catch {
+      setCarregando(false);
+      setErro("Não foi possível falar com o servidor. Tente de novo.");
+      return;
+    }
+    const corpo = await resposta.json().catch(() => ({}));
 
     setCarregando(false);
 
-    if (error) {
-      setErro(traduzir(error.code, error.message));
+    if (!resposta.ok) {
+      setErro(traduzir(corpo.codigo, corpo.mensagem ?? ""));
       return;
     }
 

@@ -1,10 +1,8 @@
-import { createClient } from "./supabase/client";
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
+const BASE = "/servidor";
 
 // Maior que o teto de 20s por chamada da LLM, senao a pagina aborta antes.
 const PRAZO = 15000;
-const PRAZO_LLM = 60000;
+const PRAZO_LLM = 70000;
 
 // Conflito: apagar ou mexer nisso quebraria algo que ja esta em uso.
 export class Conflito extends Error {
@@ -26,12 +24,6 @@ export async function api<T>(
   init?: RequestInit & { llm?: boolean },
 ): Promise<T> {
   const { llm, ...resto } = init ?? {};
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) sessaoExpirada();
 
   let res: Response;
   try {
@@ -40,7 +32,6 @@ export async function api<T>(
       signal: AbortSignal.timeout(llm ? PRAZO_LLM : PRAZO),
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
         ...resto?.headers,
       },
     });

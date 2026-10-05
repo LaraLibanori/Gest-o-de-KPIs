@@ -27,7 +27,7 @@ ESCOPO := ivanabreuelementardis-projects
 VERCEL := vercel --scope $(ESCOPO)
 
 # O que precisa estar cadastrado na Vercel para o deploy funcionar.
-VARS_FRONT := NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY
+VARS_FRONT := SUPABASE_URL SUPABASE_ANON_KEY
 VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY NVIDIA_API_KEY OPENROUTER_API_KEY GROQ_API_KEY
 
 # Le o arquivo de ambiente ignorando o \r que o Windows deixa no fim da linha.
@@ -79,12 +79,12 @@ dev: portas
 
 # Sem o --port o Next pula de porta e o CORS do backend erra o alvo.
 dev-front:
-	cd frontend && NEXT_PUBLIC_API_URL=$(URL_BACK) npm run dev -- --port $(PORTA_FRONT)
+	cd frontend && BACKEND_URL=$(URL_BACK) npm run dev -- --port $(PORTA_FRONT)
 
 # KPI_POOL reaproveita a conexao: so aqui, onde o processo e longo.
 dev-back:
 	$(call CARREGAR,$(ENV_BACK)); \
-	export FRONTEND_ORIGIN=$(URL_FRONT) KPI_POOL=1; \
+	export KPI_POOL=1; \
 	cd backend && "$(PY)" -m uvicorn app.main:app --reload --port $(PORTA_BACK)
 
 portas:
