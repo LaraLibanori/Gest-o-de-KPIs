@@ -39,13 +39,17 @@ def _sessoes() -> async_sessionmaker[AsyncSession]:
     return _fabrica
 
 
+# O true prende o valor a transacao: depois de um commit e preciso chamar de novo.
+async def entrar(sessao: AsyncSession, user: CurrentUser) -> None:
+    await sessao.execute(
+        text("select set_config('request.jwt.claims', :claims, true)"),
+        {"claims": json.dumps({"sub": str(user.id), "role": "authenticated"})},
+    )
+
+
 async def abrir_sessao(user: CurrentUser) -> AsyncIterator[AsyncSession]:
     async with _sessoes()() as sessao:
-        # O true prende o valor a transacao: senao vaza para o proximo cliente.
-        await sessao.execute(
-            text("select set_config('request.jwt.claims', :claims, true)"),
-            {"claims": json.dumps({"sub": str(user.id), "role": "authenticated"})},
-        )
+        await entrar(sessao, user)
         yield sessao
 
 

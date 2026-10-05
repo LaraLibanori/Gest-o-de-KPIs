@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 
 from ..auth import CurrentUser
 from ..calculo import JANELA_PADRAO, calcular
-from ..db import Sessao
+from ..db import Sessao, entrar
 from ..formula import derivar
 from ..models import Conexao as ConexaoDb
 from ..models import Dashboard as DashboardDb
@@ -39,14 +39,15 @@ async def _montar(
             .order_by(VinculoDb.ordem)
         )
     )
-    indicadores = [
-        i
+    por_id = {
+        i.id: i
         for i in await sessao.scalars(
             select(IndicadorDb).where(
                 IndicadorDb.id.in_([v.indicador_id for v in vinculos] or [None])
             )
         )
-    ]
+    }
+    indicadores = [por_id[v.indicador_id] for v in vinculos if v.indicador_id in por_id]
     if not indicadores:
         return Dashboard(
             id=linha.id,
@@ -156,6 +157,7 @@ async def criar(
     )
     sessao.add(linha)
     await sessao.commit()
+    await entrar(sessao, user)
     return await _montar(sessao, organizacao_id, linha, JANELA_PADRAO)
 
 
@@ -211,6 +213,7 @@ async def ajustar(
     if dados.descricao is not None:
         linha.descricao = dados.descricao
     await sessao.commit()
+    await entrar(sessao, user)
     return await _montar(sessao, organizacao_id, linha, JANELA_PADRAO)
 
 
@@ -238,35 +241,32 @@ async def trocar_indicadores(
 ):
     await papel(sessao, organizacao_id, user.id)
     linha = await _linha(sessao, organizacao_id, dashboard_id)
-    ids = dados.indicadores[:40]
+    ids = list(dict.fromkeys(dados.indicadores))
 
-    existentes = set(
+    donos = set(
         await sessao.scalars(
-            select(IndicadorDb.conexao_id)
-            .join(VinculoDb, VinculoDb.indicador_id == IndicadorDb.id)
-            .where(VinculoDb.dashboard_id == dashboard_id)
-        )
-    )
-    donos = {
-        c
-        for c in await sessao.scalars(
             select(ConexaoDb.id).where(ConexaoDb.organizacao_id == organizacao_id)
         )
-    }
-    if any(c not in donos for c in existentes):
-        raise HTTPException(403, "esse dashboard tem indicador de outra organização")
+    )
+    conexoes = dict(
+        (
+            await sessao.execute(
+                select(IndicadorDb.id, IndicadorDb.conexao_id).where(
+                    IndicadorDb.id.in_(ids)
+                )
+            )
+        ).all()
+    )
+    if any(conexoes.get(i) not in donos for i in ids):
+        raise HTTPException(422, "indicador não pertence à organização")
 
     await sessao.execute(
         delete(VinculoDb).where(VinculoDb.dashboard_id == dashboard_id)
     )
-    for ordem, indicador_id in enumerate(ids):
-        pertence = await sessao.scalar(
-            select(IndicadorDb.conexao_id).where(IndicadorDb.id == indicador_id)
-        )
-        if pertence is None or pertence not in donos:
-            raise HTTPException(422, "indicador não pertence à organização")
-        sessao.add(
-            VinculoDb(dashboard_id=dashboard_id, indicador_id=indicador_id, ordem=ordem)
-        )
+    sessao.add_all(
+        VinculoDb(dashboard_id=dashboard_id, indicador_id=i, ordem=ordem)
+        for ordem, i in enumerate(ids)
+    )
     await sessao.commit()
+    await entrar(sessao, user)
     return await _montar(sessao, organizacao_id, linha, JANELA_PADRAO)
