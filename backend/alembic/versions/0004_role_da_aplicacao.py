@@ -34,8 +34,7 @@ def upgrade() -> None:
     )
     op.execute(f"alter role {ROLE} with password '{senha}'")
 
-    # nosuperuser e nobypassrls sao o padrao, e o postgres do Supabase nao tem
-    # privilegio para declarar essas clausulas. Entao confere em vez de presumir.
+    # O postgres do Supabase nao declara nosuperuser, entao confere em vez de presumir.
     op.execute(
         f"""
         do $$
@@ -57,8 +56,7 @@ def upgrade() -> None:
     # update por causa do select ... for update que trava o ultimo dono.
     op.execute(f"grant select, insert, update, delete on organizacao_membros to {ROLE}")
 
-    # O schema auth e do supabase_admin e o postgres nao consegue liberar acesso
-    # a ele, entao as policies leem o usuario daqui em vez de auth.uid().
+    # O schema auth nao e liberavel pelo postgres, entao as policies leem o usuario daqui.
     op.execute(
         """
         create function public.usuario_atual() returns uuid
@@ -79,8 +77,7 @@ def upgrade() -> None:
         """
     )
 
-    # O convite precisa achar quem ainda nao divide organizacao, e a policy de
-    # perfis esconde essa linha. Esta funcao e a unica porta para isso.
+    # A policy de perfis esconde quem ainda nao divide organizacao: so esta funcao acha.
     op.execute(
         """
         create function public.usuario_por_email(p_email text) returns uuid
@@ -118,10 +115,7 @@ def upgrade() -> None:
         """
     )
 
-    # Criar organizacao pela API esbarra na RLS: o insert usa returning, que
-    # tambem passa pela policy de select, e quem criou ainda nao e membro. Esta
-    # funcao cria a organizacao e o dono de uma vez, garantindo que nenhuma
-    # organizacao nasca sem dono.
+    # O returning do insert passa pela policy de select, e o criador ainda nao e membro.
     op.execute(
         """
         create function public.criar_organizacao(p_nome text) returns organizacoes
@@ -191,5 +185,4 @@ def downgrade() -> None:
     for tabela in TABELAS:
         op.execute(f"revoke all on {tabela} from {ROLE}")
     op.execute(f"revoke usage on schema public from {ROLE}")
-    # O role fica, sem nenhum privilegio. Dropar e recriar invalida a identidade
-    # que o pooler do Supabase guarda em cache e derruba a conexao por um tempo.
+    # O role fica sem privilegio: dropar e recriar derruba a conexao no pooler.

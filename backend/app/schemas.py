@@ -308,8 +308,7 @@ class Painel(BaseModel):
     janela: JANELA
     indicadores: list[IndicadorCalculado] = []
     dimensoes: list[Dimensao] = []
-    # Falso quando a tabela fato nao tem coluna de data: ai o filtro de periodo
-    # nao teria efeito e a interface esconde o controle.
+    # Falso sem coluna de data: o filtro de periodo nao teria efeito.
     janelavel: bool = True
     erro: str | None = None
     avisos: list[str] = []

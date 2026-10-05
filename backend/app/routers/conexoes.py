@@ -19,9 +19,7 @@ router = APIRouter(prefix=PREFIXO, tags=["conexões"])
 
 DUPLICADO = "esta organização já tem uma conexão chamada {nome}"
 
-# Colunas que aceitam ficar sem valor. Nas outras, mandar vazio é erro e não
-# "limpa": a validação entrega None, e escrever None em coluna NOT NULL só daria
-# um 500 sem dizer o que aconteceu.
+# Colunas que aceitam ficar sem valor: nas outras, None daria 500 em coluna NOT NULL.
 LIMPAVEIS = {
     "esquema",
     "tabela_fato",
@@ -108,11 +106,7 @@ async def _inspecionar(conexao: ConexaoDb, esquema: str | None) -> Verificacao:
 async def provar(
     organizacao_id: UUID, body: ConexaoProva, user: CurrentUser, sessao: Sessao
 ):
-    """Testa a credencial digitada sem criar nada.
-
-    Existe para a pessoa descobrir que a senha esta errada antes de preencher o
-    resto, e para o botao "Testar" nao deixar rascunho para tras.
-    """
+    """Testa a credencial digitada sem criar nada."""
     await exigir_dono(sessao, organizacao_id, user.id, "testar conexão")
     provisoria = ConexaoDb(
         organizacao_id=organizacao_id,

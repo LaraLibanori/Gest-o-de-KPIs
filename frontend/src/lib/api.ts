@@ -2,9 +2,7 @@ import { createClient } from "./supabase/client";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
-// A LLM tem fila de provedores e um teto de 20s por chamada, entao o prazo do
-// navegador precisa ser maior que isso. Sem essa folga, um provedor lento
-// levava a pagina a abortar a chamada e o recurso nunca aparecia.
+// Maior que o teto de 20s por chamada da LLM, senao a pagina aborta antes.
 const PRAZO = 15000;
 const PRAZO_LLM = 60000;
 
@@ -57,8 +55,7 @@ const GENERICO: Record<number, string> = {
 };
 
 async function mensagem(res: Response): Promise<string> {
-  // 401 nao tem detalhe util, e 422 do FastAPI vem como lista de campo, entao
-  // so o texto simples do backend presta nesse caso.
+  // 422 do FastAPI vem como lista de campo: so o texto simples do backend presta.
   if (res.status === 401) return GENERICO[401];
   const corpo = await res.json().catch(() => null);
   if (typeof corpo?.detail === "string") return corpo.detail;

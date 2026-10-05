@@ -1,5 +1,4 @@
 -- Dados de exemplo. Rode depois de criar a conta, trocando o e-mail.
--- A estrutura do banco vem das migrations: `make migrar`.
 with nova as (
   insert into organizacoes (nome, criada_por)
   select 'Empresa Exemplo', u.id

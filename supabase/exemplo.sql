@@ -1,12 +1,10 @@
 -- Base de exemplo, no papel de banco do cliente. Rode com `make exemplo`.
--- A senha vem de DEMO_LEITOR_PASSWORD, não fica aqui.
 
 create schema if not exists exemplo;
 
 begin;
 
--- A base é refeita a cada execução e termina sempre na data de hoje, então os
--- números mudam de um dia para o outro. O setseed só reduz a variação.
+-- Termina sempre na data de hoje, então os números mudam de um dia para o outro.
 select setseed(0.42);
 
 drop table if exists exemplo.vendas;
@@ -28,8 +26,7 @@ create table exemplo.vendas (
   vendida_em       date not null
 );
 
--- Grão: uma linha é uma venda. Por isso "ticket médio" é a média de valor_total.
--- O pedido_id é o número do pedido, único por construção; o id é a chave técnica.
+-- Grão: uma linha é uma venda, então "ticket médio" é a média de valor_total.
 insert into exemplo.vendas
   (pedido_id, cliente_id, produto, categoria, regiao, canal, vendedor,
    forma_pagamento, quantidade, valor_unitario, custo_unitario, desconto,

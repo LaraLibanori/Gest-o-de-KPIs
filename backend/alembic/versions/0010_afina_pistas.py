@@ -7,8 +7,7 @@ down_revision = "0009"
 branch_labels = None
 depends_on = None
 
-# Pista com palavra generica empatava com a coluna errada: "identificador do
-# cliente" casava tanto com cliente_id quanto com id.
+# Pista generica empatava com a coluna errada: "identificador do cliente" casava com id.
 TROCAS = [
     ("identificador do ", ""),
     ("valor da venda", "valor total da venda"),

@@ -1,5 +1,4 @@
-// Piso de rotulo: quando a LLM nao respondeu, o usuario ainda nao ve
-// "id_cliente" nem "valor_total" na tela.
+// Piso de rotulo para quando a LLM nao respondeu.
 const TABELA: Record<string, string> = {
   id: "Identificador",
   dia: "Dia",
