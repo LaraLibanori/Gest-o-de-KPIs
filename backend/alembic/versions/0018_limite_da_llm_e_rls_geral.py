@@ -33,6 +33,7 @@ def upgrade() -> None:
         declare
           v_usuario uuid := public.usuario_atual();
         begin
+          perform pg_advisory_xact_lock(hashtext('uso_llm'));
           delete from uso_llm where criado_em < now() - interval '2 days';
           if (select count(*) from uso_llm
               where usuario_id = v_usuario
