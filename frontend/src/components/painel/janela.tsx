@@ -14,7 +14,11 @@ export default function ControleJanela({
 }) {
   if (desabilitado) return null;
   return (
-    <Tabs value={janela} onValueChange={(v) => onMudar(v as Janela)}>
+    <Tabs
+      value={janela}
+      activationMode="manual"
+      onValueChange={(v) => onMudar(v as Janela)}
+    >
       <TabsList aria-label="Período">
         {JANELAS.map((j) => (
           <TabsTrigger key={j.valor} value={j.valor}>

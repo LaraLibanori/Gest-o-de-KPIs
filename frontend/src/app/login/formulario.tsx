@@ -60,7 +60,9 @@ export default function Formulario() {
 
     // A conta já nasce ativa, então quem se cadastra entra direto.
     if (modo === "criar") sessionStorage.setItem("conta-criada", "1");
-    router.push("/");
+    const proxima = new URLSearchParams(window.location.search).get("proxima");
+    // So caminho do proprio site: "//x" e "/\x" levariam para outro dominio.
+    router.push(proxima && /^\/(?![/\\])/.test(proxima) ? proxima : "/");
     router.refresh();
   }
 

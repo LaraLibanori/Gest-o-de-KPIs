@@ -12,7 +12,12 @@ export class Conflito extends Error {
 }
 
 function sessaoExpirada(): never {
-  if (typeof window !== "undefined") window.location.assign("/login");
+  if (typeof window !== "undefined") {
+    const { pathname, search } = window.location;
+    window.location.assign(
+      `/login?proxima=${encodeURIComponent(pathname + search)}`,
+    );
+  }
   throw new Error("sessão expirada, faça login de novo");
 }
 
@@ -55,7 +60,6 @@ export async function api<T>(
 
 // O backend escreve o detalhe em português; só escondo onde ele não ajuda.
 const GENERICO: Record<number, string> = {
-  401: "sessão expirada, faça login de novo",
   403: "você não tem permissão para isso",
   404: "não encontrado",
   422: "confira os dados preenchidos",
@@ -63,7 +67,6 @@ const GENERICO: Record<number, string> = {
 
 async function mensagem(res: Response): Promise<string> {
   // 422 do FastAPI vem como lista de campo: so o texto simples do backend presta.
-  if (res.status === 401) return GENERICO[401];
   const corpo = await res.json().catch(() => null);
   if (typeof corpo?.detail === "string") return corpo.detail;
   return GENERICO[res.status] ?? "não foi possível completar a ação";
