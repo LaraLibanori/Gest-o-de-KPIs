@@ -214,15 +214,15 @@ class ComposicaoFalsa:
     async def fetch(self, sql, *args):
         self.sql = sql
         return [
-            {"rotulo": "Site", "valor": 46},
-            {"rotulo": "App", "valor": 32},
-            {"rotulo": None, "valor": 3},
+            {"rotulo": "Site", "valor": 46, "total": 81},
+            {"rotulo": "App", "valor": 32, "total": 81},
+            {"rotulo": None, "valor": 3, "total": 81},
         ]
 
 
 async def test_composicao_cita_dimensao_e_ordena():
     conexao = ComposicaoFalsa()
-    pontos = await compor(
+    pontos, total = await compor(
         conexao,
         "exemplo.vendas",
         Indicador(agregacao="soma"),
@@ -232,6 +232,7 @@ async def test_composicao_cita_dimensao_e_ordena():
     assert "order by 2 desc" in conexao.sql
     assert 'canal""; drop table x; --' in conexao.sql
     assert pontos[2]["rotulo"] == "sem valor"
+    assert total == 81
 
 
 async def test_composicao_respeita_a_janela():

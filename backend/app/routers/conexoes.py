@@ -9,6 +9,7 @@ from ..auth import CurrentUser
 from ..cripto import cifrar
 from ..db import Sessao
 from ..introspeccao import listar_esquemas, listar_relacoes
+from ..models import Campo as CampoDb
 from ..models import Conexao as ConexaoDb
 from ..models import Indicador as IndicadorDb
 from ..permissoes import exigir_dono, papel
@@ -175,6 +176,13 @@ async def avancar(
         )
         if not tem:
             raise HTTPException(409, "defina ao menos um indicador antes de concluir")
+
+    nova_tabela = mudancas.get("tabela_fato")
+    if conexao.tabela_fato and nova_tabela and nova_tabela != conexao.tabela_fato:
+        await sessao.execute(
+            delete(IndicadorDb).where(IndicadorDb.conexao_id == conexao_id)
+        )
+        await sessao.execute(delete(CampoDb).where(CampoDb.conexao_id == conexao_id))
 
     for campo, valor in mudancas.items():
         setattr(conexao, campo, valor)

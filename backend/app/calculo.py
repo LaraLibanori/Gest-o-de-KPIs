@@ -249,23 +249,27 @@ async def compor(
     janela: str | None = None,
     limite: int = LIMITE_QUEBRA,
     calculados: list[tuple[str, str]] | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], float | None]:
     if indicador.agregacao != "contagem" and not indicador.coluna:
         raise Impossivel(SEM_CAMPO)
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     inicio, _, _ = janela_de(janela)
     onde = _onde(indicador.tempo, inicio)
+    # Soma de grupos so tem sentido para soma e contagem; a janela vale antes do limit.
+    aditivo = indicador.agregacao in ("soma", "contagem")
+    total = f", sum({_conta(indicador)}) over () as total" if aditivo else ""
     try:
         linhas = await conexao.fetch(
             f"select {citar(dimensao)}::text as rotulo, {_conta(indicador)} as valor"
-            f" from {_fonte(tabela, calculados)}{onde} group by 1"
+            f"{total} from {_fonte(tabela, calculados)}{onde} group by 1"
             f" order by 2 desc nulls last limit {int(limite)}",
         )
     except asyncpg.UndefinedColumnError:
         raise Impossivel(SEM_COLUNA) from None
     except asyncpg.QueryCanceledError:
         raise Impossivel(SEM_TEMPO) from None
-    return [
+    pontos = [
         {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
         for r in linhas
     ]
+    return pontos, _numero(linhas[0]["total"]) if aditivo and linhas else None

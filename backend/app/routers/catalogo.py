@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from ..auth import CurrentUser
 from ..db import Sessao
@@ -108,6 +108,22 @@ async def sugerir_rotulos(
     resposta = Sugestao(
         aplicadas=aplicadas, campos=[Campo.model_validate(c) for c in campos]
     )
+    await sessao.commit()
+    return resposta
+
+
+@router.post("/{conexao_id}/catalogo/confirmar", response_model=list[Campo])
+async def confirmar_catalogo(
+    organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
+):
+    await exigir_dono(sessao, organizacao_id, user.id, "confirmar o catálogo")
+    await buscar(sessao, organizacao_id, conexao_id)
+    await sessao.execute(
+        update(CampoDb)
+        .where(CampoDb.conexao_id == conexao_id, CampoDb.formula.is_(None))
+        .values(confirmado=True)
+    )
+    resposta = [Campo.model_validate(c) for c in await campos_da(sessao, conexao_id)]
     await sessao.commit()
     return resposta
 

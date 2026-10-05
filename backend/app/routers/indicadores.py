@@ -604,7 +604,7 @@ async def composicao(
         raise HTTPException(422, "essa coluna não serve para quebrar o indicador")
 
     calculados, _ = derivar(catalogo)
-    pontos = await consultar(
+    pontos, total = await consultar(
         conexao,
         lambda externa: compor(
             externa,
@@ -620,9 +620,6 @@ async def composicao(
         (c.rotulo or c.coluna for c in catalogo if c.coluna == dimensao),
         dimensao,
     )
-    total = None
-    if alvo.agregacao in ("soma", "contagem"):
-        total = sum(p["valor"] for p in pontos if p["valor"] is not None) or None
     return Composicao(
         coluna=dimensao,
         rotulo=rotulo,
