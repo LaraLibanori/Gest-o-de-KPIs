@@ -20,12 +20,12 @@ AGREGACOES = {
     "maximo": "max({})",
 }
 
-# Inicio de agora, inicio da janela anterior e balde da serie; fragmentos fixos.
+# Inicio da janela, da anterior e balde da serie; hoje conta, entao 7d comeca 6 dias atras.
 JANELAS: dict[str, tuple[str, str, str]] = {
-    "7d": ("current_date - 7", "current_date - 14", "day"),
-    "30d": ("current_date - 30", "current_date - 60", "day"),
-    "90d": ("current_date - 90", "current_date - 180", "week"),
-    "12m": ("current_date - 365", "current_date - 730", "month"),
+    "7d": ("current_date - 6", "current_date - 13", "day"),
+    "30d": ("current_date - 29", "current_date - 59", "day"),
+    "90d": ("current_date - 89", "current_date - 179", "week"),
+    "12m": ("current_date - 364", "current_date - 729", "month"),
     "tudo": ("", "", "month"),
 }
 JANELA_PADRAO = "30d"
@@ -36,6 +36,11 @@ SEM_COLUNA = "a coluna não existe mais na tabela"
 SEM_NUMERO = "a coluna não guarda número"
 SEM_TEMPO = "o banco demorou demais, atualize para tentar de novo"
 CAIU = "a conexão com o banco caiu"
+FALHOU = "o banco recusou a consulta"
+
+
+class Impossivel(Exception):
+    pass
 
 
 def janela_de(nome: str | None) -> tuple[str, str, str]:
@@ -58,7 +63,10 @@ def _onde(coluna: str | None, inicio: str, fim: str = "") -> str:
 
 
 def _numero(valor) -> float | None:
-    return None if valor is None else float(valor)
+    try:
+        return None if valor is None else float(valor)
+    except (TypeError, ValueError):
+        raise Impossivel(SEM_NUMERO) from None
 
 
 def variacao(agora: float | None, antes: float | None) -> float | None:
@@ -84,12 +92,17 @@ def _fonte(tabela: str, calculados: list[tuple[str, str]] | None) -> str:
 
 
 def _falha(erro: Exception) -> dict:
+    if isinstance(erro, Impossivel):
+        return {"erro": str(erro)}
     if isinstance(erro, asyncpg.UndefinedColumnError):
         return {"erro": SEM_COLUNA}
+    if isinstance(erro, asyncpg.QueryCanceledError):
+        return {"erro": SEM_TEMPO}
     if _caiu(erro):
         return {"erro": CAIU}
     if isinstance(erro, asyncpg.PostgresError):
-        return {"erro": str(erro).split("\n")[0]}
+        registro.warning("o banco do cliente recusou a consulta: %s", erro)
+        return {"erro": FALHOU}
     registro.exception("falha inesperada ao calcular")
     return {"erro": "não foi possível calcular"}
 
@@ -112,7 +125,7 @@ async def _valores(
     try:
         linha = await conexao.fetchrow(f"select {campos} from {de}")
     except Exception as e:  # noqa: BLE001 - refaz um a um para o erro ficar no indicador
-        if _caiu(e):
+        if _caiu(e) or isinstance(e, asyncpg.QueryCanceledError):
             return {str(i.id): _falha(e) for i in grupo}
         saida: dict[str, dict] = {}
         for indicador in grupo:
@@ -130,10 +143,10 @@ async def _valores(
     for n, indicador in enumerate(grupo):
         try:
             agora = _numero(linha[f"v{n}"])
-        except (TypeError, ValueError):
-            saida[str(indicador.id)] = {"erro": SEM_NUMERO}
+            antes_ = _numero(linha[f"a{n}"]) if antes else None
+        except Impossivel as e:
+            saida[str(indicador.id)] = {"erro": str(e)}
             continue
-        antes_ = _numero(linha[f"a{n}"]) if antes else None
         saida[str(indicador.id)] = {
             "valor": agora,
             "anterior": antes_,
@@ -180,12 +193,14 @@ async def calcular(
 
     com_tempo = [i for i in validos if i.tempo]
     sem_tempo = [i for i in validos if not i.tempo]
-    tempo = com_tempo[0].tempo if com_tempo else None
 
-    if time.monotonic() > prazo:
-        return {**resultados, **{str(i.id): {"erro": SEM_TEMPO} for i in validos}}
-
-    if com_tempo:
+    por_tempo: dict[str, list] = {}
+    for indicador in com_tempo:
+        por_tempo.setdefault(indicador.tempo, []).append(indicador)
+    for tempo, grupo in por_tempo.items():
+        if time.monotonic() > prazo:
+            resultados.update({str(i.id): {"erro": SEM_TEMPO} for i in grupo})
+            continue
         atual = _filtro(tempo, inicio)
         antes = (
             _filtro(tempo, inicio_anterior, f" and {citar(tempo)} < {inicio}")
@@ -193,7 +208,7 @@ async def calcular(
             else ""
         )
         resultados.update(
-            await _valores(conexao, de, atual, antes, com_tempo, _onde(tempo, inicio))
+            await _valores(conexao, de, atual, antes, grupo, _onde(tempo, inicio))
         )
     if sem_tempo:
         resultados.update(await _valores(conexao, de, "", "", sem_tempo))
@@ -213,7 +228,12 @@ async def calcular(
             continue
         try:
             dados["serie"] = await _serie(
-                conexao, de, _onde(tempo, inicio), tempo, balde, _conta(indicador)
+                conexao,
+                de,
+                _onde(indicador.tempo, inicio),
+                indicador.tempo,
+                balde,
+                _conta(indicador),
             )
         except Exception:  # noqa: BLE001 - sem serie o numero ainda serve
             registro.exception("falha na serie de %s", indicador.nome)
@@ -230,14 +250,22 @@ async def compor(
     limite: int = LIMITE_QUEBRA,
     calculados: list[tuple[str, str]] | None = None,
 ) -> list[dict]:
+    if indicador.agregacao != "contagem" and not indicador.coluna:
+        raise Impossivel(SEM_CAMPO)
+    await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     inicio, _, _ = janela_de(janela)
-    tempo = indicador.tempo if indicador.tempo else None
-    onde = _onde(tempo, inicio)
-    return [
-        {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
-        for r in await conexao.fetch(
+    onde = _onde(indicador.tempo, inicio)
+    try:
+        linhas = await conexao.fetch(
             f"select {citar(dimensao)}::text as rotulo, {_conta(indicador)} as valor"
             f" from {_fonte(tabela, calculados)}{onde} group by 1"
             f" order by 2 desc nulls last limit {int(limite)}",
         )
+    except asyncpg.UndefinedColumnError:
+        raise Impossivel(SEM_COLUNA) from None
+    except asyncpg.QueryCanceledError:
+        raise Impossivel(SEM_TEMPO) from None
+    return [
+        {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
+        for r in linhas
     ]

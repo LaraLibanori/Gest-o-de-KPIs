@@ -8,6 +8,7 @@ import asyncpg
 from fastapi import HTTPException
 from sqlalchemy import select
 
+from ..calculo import Impossivel
 from ..cripto import decifrar
 from ..models import Campo as CampoDb
 from ..models import Conexao as ConexaoDb
@@ -40,6 +41,8 @@ async def consultar(conexao: ConexaoDb, tarefa: Callable[[asyncpg.Connection], A
             return await tarefa(externa)
         finally:
             await externa.close()
+    except Impossivel as e:
+        raise HTTPException(422, str(e)) from None
     except RedeInterna as e:
         raise HTTPException(400, str(e)) from None
     except TimeoutError:

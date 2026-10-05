@@ -2,8 +2,7 @@ import re
 
 from .introspeccao import citar
 
-# A formula vira SQL, entao so entra o que esta aqui. O texto da pessoa nunca e
-# repassado: o SQL e remontado token por token.
+# O texto digitado nunca e repassado: o SQL e remontado token por token.
 NUMERO = re.compile(r"\d+(?:\.\d+)?")
 COLUNA = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -15,7 +14,6 @@ FUNCOES = {
     "round": (1, 2),
     "power": (2, 2),
     "coalesce": (1, None),
-    "nullif": (2, 2),
     "least": (1, None),
     "greatest": (1, None),
 }
@@ -34,6 +32,8 @@ PALAVRAS = {
     "truncate": "fórmula não mexe no esquema",
     "grant": "fórmula não mexe em permissão",
     "into": "fórmula não escreve",
+    "case": "fórmula não tem condição",
+    "when": "fórmula não tem condição",
 }
 
 
@@ -86,7 +86,7 @@ class _Leitor:
             if self.comecar("*"):
                 texto = f"({texto} * {self.fator()})"
             elif self.comecar("/"):
-                texto = f"(nullif({texto}, 0) / {self.fator()})"
+                texto = f"({texto} / nullif(({self.fator()})::numeric, 0))"
             else:
                 return texto
 
@@ -151,6 +151,8 @@ class _Leitor:
                 raise FormulaInvalida("fórmula tem parêntese que não fecha")
             if len(argumentos) < minimo or (maximo and len(argumentos) > maximo):
                 raise FormulaInvalida(f"{nome} não aceita {len(argumentos)} argumentos")
+            if baixo == "round" and len(argumentos) == 2:
+                argumentos[0] = f"({argumentos[0]})::numeric"
             return f"{baixo}({', '.join(argumentos)})"
 
         if nome.lower() in PALAVRAS:
@@ -177,6 +179,8 @@ def analisar(
     leitor = _Leitor(formula, conhecidos, permitidos)
     sql = leitor.expressao()
     if not leitor.fim():
+        if leitor.sobra()[0] in "<>=!":
+            raise FormulaInvalida("fórmula não compara valores")
         raise FormulaInvalida("fórmula tem sobra no fim")
     if not leitor.usadas:
         raise FormulaInvalida("fórmula precisa de pelo menos uma coluna")
@@ -184,11 +188,7 @@ def analisar(
 
 
 def derivar(campos) -> tuple[list[tuple[str, str]], list[str]]:
-    """Monta o SQL dos campos calculados e devolve tambem os que quebraram.
-
-    So entra formula que aponta para coluna real ou para campo calculado anterior,
-    entao referencia circular nao chega no banco.
-    """
+    """Monta o SQL dos campos calculados e devolve os que quebraram."""
     base = {c.coluna for c in campos if not c.formula}
     conhecidos = {c.coluna for c in campos}
     prontos: set[str] = set()

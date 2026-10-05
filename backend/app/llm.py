@@ -11,9 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 registro = logging.getLogger("kpi")
 
-# Ordem da fila: NVIDIA (gratis) primeiro, OpenRouter e Groq de reserva.
-# O ultimo campo filtra so preco zero: vale pro OpenRouter, que tem os dois.
-# A Groq lista o preco do plano pago, mas a conta free so leva rate limit.
+# Ordem da fila; o ultimo campo filtra so preco zero (a Groq lista o preco do plano pago).
 PROVEDORES = [
     ("nvidia_nim", "https://integrate.api.nvidia.com/v1", "NVIDIA_API_KEY", True),
     ("openrouter", "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", True),
@@ -198,44 +196,6 @@ async def _listar(cliente: httpx.AsyncClient, base: str, chave: str) -> list[dic
     return resposta.json().get("data", [])
 
 
-# A pagina free da NVIDIA marca os modelos com "Free Endpoint". Responde 202
-# quando desconfia de bot: ai desiste na hora e segue sem a lista.
-async def _gratuitos_nvidia(cliente: httpx.AsyncClient) -> set[str]:
-    try:
-        resposta = await cliente.get(
-            "https://build.nvidia.com/models",
-            params={"filters": "nimType:nim_type_preview", "pageSize": "96"},
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-                ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://build.nvidia.com/",
-            },
-            timeout=5,
-        )
-        if resposta.status_code != 200:
-            return set()
-        html = resposta.text
-    except httpx.HTTPError:
-        return set()
-    cartoes = []
-    for marca in re.finditer(r"<a\s[^>]*>", html):
-        rotulo = re.search(r'data-nvtrack-nav-object-label="([^"]+)"', marca.group(0))
-        href = re.search(r'href="/([^"]+)"', marca.group(0))
-        if rotulo and href and "/" in href.group(1):
-            cartoes.append((href.group(1), marca.start()))
-    gratuitos = set()
-    for i, (nome, pos) in enumerate(cartoes):
-        # O selo vem antes do nome, dentro do mesmo cartao.
-        inicio = cartoes[i - 1][1] if i else 0
-        if "Free Endpoint" in html[inicio:pos]:
-            gratuitos.add(nome)
-    return gratuitos
-
-
 async def modelos() -> list[str]:
     global _modelos, _modelos_em
     async with _tranca:
@@ -244,8 +204,7 @@ async def modelos() -> list[str]:
         # O litellm so conhece NVIDIA_NIM_API_KEY: espelha a nossa.
         if os.environ.get("NVIDIA_API_KEY"):
             os.environ.setdefault("NVIDIA_NIM_API_KEY", os.environ["NVIDIA_API_KEY"])
-        encontrados: list[tuple[int, int, float, str]] = []
-        gratuitos: set[str] = set()
+        encontrados: list[tuple[int, float, str]] = []
         async with httpx.AsyncClient(timeout=10) as cliente:
             for ordem, (provedor, base, variavel, so_gratuito) in enumerate(PROVEDORES):
                 chave = os.environ.get(variavel)
@@ -256,22 +215,18 @@ async def modelos() -> list[str]:
                 except httpx.HTTPError:
                     registro.warning("não foi possível listar modelos de %s", provedor)
                     continue
-                if provedor == "nvidia_nim":
-                    gratuitos = await _gratuitos_nvidia(cliente)
                 for m in lista:
                     if not _serve(m, so_gratuito):
                         continue
                     nome = f"{provedor}/{m['id']}"
-                    livre = 0 if m["id"] in gratuitos else 1
                     porte = -1.0 if nome == SORTEIO else _porte(m["id"])
-                    encontrados.append((ordem, livre, -porte, nome))
-        _modelos = [nome for _, _, _, nome in sorted(encontrados)]
+                    encontrados.append((ordem, -porte, nome))
+        _modelos = [nome for _, _, nome in sorted(encontrados)]
         _modelos_em = time.monotonic()
         return _modelos
 
 
-# O Router guarda quem falhou e deixa de molho pelo tempo do descanso.
-# Lista nova recria o roteador: provedor que voltou entra de volta.
+# O Router deixa de molho quem falhou; lista nova recria o roteador.
 async def _montar(disponiveis: list[str]):
     global _roteador
     if _roteador is not None and {m["model_name"] for m in _roteador.model_list} == set(

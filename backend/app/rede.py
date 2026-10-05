@@ -22,13 +22,8 @@ async def conferir(host: str) -> str:
 
     for info in enderecos:
         ip = ipaddress.ip_address(info[4][0])
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_reserved
-            or ip.is_multicast
-        ):
+        embutido = getattr(ip, "ipv4_mapped", None) or getattr(ip, "sixtofour", None)
+        if not ip.is_global or (embutido and not embutido.is_global):
             raise RedeInterna("endereço de rede interna não é aceito")
 
     # IPv4 na frente: as funções da Vercel não saem por IPv6.

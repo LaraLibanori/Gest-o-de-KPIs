@@ -121,11 +121,10 @@ async def test_agora_e_antes_viem_no_mesmo_select():
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     valores = [s for s in conexao.selects if "filter" in s]
     assert len(valores) == 1
-    # "filter (where" e a sintaxe do Postgres. Com "filter (" a query nem roda,
-    # e o erro some no fallback por indicador, levando a variacao junto.
+    # Com "filter (" a query nem roda, e o fallback por indicador perde a variacao.
     assert 'sum("valor_total") filter (where "vendida_em" >=' in valores[0]
-    assert "current_date - 60" in valores[0]
-    assert "current_date - 30" in valores[0]
+    assert "current_date - 59" in valores[0]
+    assert "current_date - 29" in valores[0]
 
 
 async def test_janela_tudo_nao_pede_variacao():
@@ -137,9 +136,7 @@ async def test_janela_tudo_nao_pede_variacao():
 
 
 async def test_a_janela_anterior_nao_pode_vir_de_where_externo():
-    # O filtro de agregacao age sobre as linhas que sobraram do where. Com where
-    # externo na janela atual, a anterior vira um recorte vazio e a variacao
-    # some sem erro nenhum: e o que aconteceu na primeira versao.
+    # Com where externo na janela atual, a anterior vira recorte vazio e a variacao some.
     conexao = ConexaoContada()
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     linha = next(s for s in conexao.selects if "filter" in s)
@@ -152,7 +149,7 @@ async def test_o_where_da_janela_vem_so_do_from():
     linha = next(s for s in conexao.selects if "filter" in s)
     dentro = linha.split("filter (where ")[1].split(")")[0]
     assert "where" not in dentro
-    assert '"vendida_em" >= current_date - 180' in dentro
+    assert '"vendida_em" >= current_date - 179' in dentro
 
 
 async def test_serie_agrupa_pelo_balde_da_janela():
@@ -211,6 +208,9 @@ class ComposicaoFalsa:
     def __init__(self):
         self.sql = None
 
+    async def execute(self, sql):
+        pass
+
     async def fetch(self, sql, *args):
         self.sql = sql
         return [
@@ -237,19 +237,18 @@ async def test_composicao_cita_dimensao_e_ordena():
 async def test_composicao_respeita_a_janela():
     conexao = ComposicaoFalsa()
     await compor(conexao, "exemplo.vendas", Indicador(), "canal", "90d")
-    assert "current_date - 90" in conexao.sql
+    assert "current_date - 89" in conexao.sql
     assert "limit 10" in conexao.sql
 
 
 async def test_resgate_usa_o_where_pronto_e_nao_o_filtro():
-    # O resgate precisa do " where " montado. Passar o fragmento do filter
-    # produziria '>= "col" >= data' e o proprio resgate viraria syntax error.
+    # Passar o fragmento do filter no resgate daria syntax error.
     conexao = ConexaoContada(quebrar="sum(")
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     resgatado = next(s for s in conexao.selects if "filter" not in s)
     assert resgatado == (
         'select sum("valor_total") from "exemplo"."vendas"'
-        ' where "vendida_em" >= current_date - 30'
+        ' where "vendida_em" >= current_date - 29'
     )
 
 

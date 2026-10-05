@@ -110,6 +110,7 @@ async def propor(
     for i in guardados:
         if not i.confirmado:
             await sessao.delete(i)
+    await sessao.flush()
 
     tempos = [c for c in colunas if c.papel == "tempo"]
     tempo = tempos[0].coluna if tempos else None
@@ -263,6 +264,7 @@ async def remover_indicador(
     forcar: bool = False,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "apagar indicador")
+    await buscar(sessao, organizacao_id, conexao_id)
     # Apagar o indicador leva junto o vinculo do dashboard: avisar antes.
     dashboards = list(
         await sessao.scalars(
@@ -376,6 +378,7 @@ async def ajustar_campo(
     sessao: Sessao,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "editar campo calculado")
+    await buscar(sessao, organizacao_id, conexao_id)
     campo = await sessao.scalar(
         select(CampoDb).where(CampoDb.id == campo_id, CampoDb.conexao_id == conexao_id)
     )
@@ -388,8 +391,8 @@ async def ajustar_campo(
         campo.rotulo = dados.rotulo
     if dados.papel is not None:
         campo.papel = dados.papel
-    await sessao.commit()
     campo.em_uso = await _em_uso(sessao, conexao_id, campo.coluna)
+    await sessao.commit()
     return campo
 
 
@@ -403,6 +406,7 @@ async def remover_campo(
     forcar: bool = False,
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "apagar campo calculado")
+    await buscar(sessao, organizacao_id, conexao_id)
     campo = await sessao.scalar(
         select(CampoDb).where(CampoDb.id == campo_id, CampoDb.conexao_id == conexao_id)
     )
@@ -591,8 +595,13 @@ async def composicao(
     if alvo is None:
         raise HTTPException(404, "indicador não encontrado")
     catalogo = await campos(sessao, conexao_id)
-    if dimensao not in {c.coluna for c in catalogo}:
-        raise HTTPException(422, "essa coluna não existe no catálogo")
+    tempos = set(
+        await sessao.scalars(
+            select(IndicadorDb.tempo).where(IndicadorDb.conexao_id == conexao_id)
+        )
+    )
+    if dimensao not in {d.coluna for d in _dimensoes(catalogo, tempos)}:
+        raise HTTPException(422, "essa coluna não serve para quebrar o indicador")
 
     calculados, _ = derivar(catalogo)
     pontos = await consultar(
@@ -611,9 +620,12 @@ async def composicao(
         (c.rotulo or c.coluna for c in catalogo if c.coluna == dimensao),
         dimensao,
     )
+    total = None
+    if alvo.agregacao in ("soma", "contagem"):
+        total = sum(p["valor"] for p in pontos if p["valor"] is not None) or None
     return Composicao(
         coluna=dimensao,
         rotulo=rotulo,
-        total=sum(p["valor"] for p in pontos if p["valor"] is not None) or None,
+        total=total,
         pontos=[Quebra(**p) for p in pontos],
     )
