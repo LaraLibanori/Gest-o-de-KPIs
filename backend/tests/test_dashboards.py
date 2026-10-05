@@ -36,3 +36,46 @@ async def test_dashboard_recusa_indicador_que_nao_e_da_organizacao(cliente, admi
             json={"indicadores": [str(uuid4())]},
         )
         assert resposta.status_code == 422
+
+
+async def test_listagem_monta_cada_dashboard_com_seus_indicadores_em_ordem(
+    cliente, admin
+):
+    ana = await criar_usuario(admin, "ana@exemplo.com")
+    conexao = {
+        "nome": "Local",
+        "host": "localhost",
+        "porta": 55432,
+        "banco": "postgres",
+        "usuario": "postgres",
+        "senha": "postgres",
+    }
+
+    async with cliente(ana) as c:
+        org = (await c.post("/organizacoes", json={"nome": "Acme"})).json()["id"]
+        base = f"/organizacoes/{org}"
+        conexao_id = (await c.post(f"{base}/conexoes", json=conexao)).json()["id"]
+        ids = [
+            await admin.fetchval(
+                "insert into indicadores (conexao_id, nome, agregacao, origem, ordem)"
+                " values ($1::uuid, $2, 'contagem', 'manual', 0) returning id",
+                conexao_id,
+                nome,
+            )
+            for nome in ("A", "B")
+        ]
+        primeiro = (await c.post(f"{base}/dashboards", json={"nome": "um"})).json()
+        segundo = (await c.post(f"{base}/dashboards", json={"nome": "dois"})).json()
+        await c.put(
+            f"{base}/dashboards/{primeiro['id']}/indicadores",
+            json={"indicadores": [str(ids[0])]},
+        )
+        await c.put(
+            f"{base}/dashboards/{segundo['id']}/indicadores",
+            json={"indicadores": [str(ids[1]), str(ids[0])]},
+        )
+
+        lista = {d["nome"]: d for d in (await c.get(f"{base}/dashboards")).json()}
+
+    assert [i["nome"] for i in lista["um"]["indicadores"]] == ["A"]
+    assert [i["nome"] for i in lista["dois"]["indicadores"]] == ["B", "A"]

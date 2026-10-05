@@ -32,38 +32,36 @@ router = APIRouter(
 async def _montar(
     sessao: Sessao, organizacao_id: UUID, linha: DashboardDb, janela: str
 ) -> Dashboard:
-    vinculos = list(
-        await sessao.scalars(
-            select(VinculoDb)
-            .where(VinculoDb.dashboard_id == linha.id)
-            .order_by(VinculoDb.ordem)
-        )
-    )
+    return (await _montar_todos(sessao, organizacao_id, [linha], janela))[0]
+
+
+async def _montar_todos(
+    sessao: Sessao, organizacao_id: UUID, linhas: list[DashboardDb], janela: str
+) -> list[Dashboard]:
+    vinculos: dict[UUID, list[UUID]] = {linha.id: [] for linha in linhas}
+    for v in await sessao.scalars(
+        select(VinculoDb)
+        .where(VinculoDb.dashboard_id.in_(list(vinculos) or [None]))
+        .order_by(VinculoDb.ordem)
+    ):
+        vinculos[v.dashboard_id].append(v.indicador_id)
+
+    todos = {i for ids in vinculos.values() for i in ids}
     por_id = {
         i.id: i
         for i in await sessao.scalars(
-            select(IndicadorDb).where(
-                IndicadorDb.id.in_([v.indicador_id for v in vinculos] or [None])
-            )
+            select(IndicadorDb).where(IndicadorDb.id.in_(list(todos) or [None]))
         )
     }
-    indicadores = [por_id[v.indicador_id] for v in vinculos if v.indicador_id in por_id]
-    if not indicadores:
-        return Dashboard(
-            id=linha.id,
-            nome=linha.nome,
-            descricao=linha.descricao,
-            criado_em=linha.criado_em,
-        )
 
-    por_conexao: dict[UUID, list] = {}
-    for indicador in indicadores:
+    por_conexao: dict[UUID, list[IndicadorDb]] = {}
+    for indicador in por_id.values():
         por_conexao.setdefault(indicador.conexao_id, []).append(indicador)
 
     saida: dict[UUID, ItemDashboard] = {}
-    nomes: list[str] = []
+    nomes: dict[UUID, str] = {}
 
-    # Cada conexao e aberta e fechada por conta propria: sao bancos diferentes.
+    # Cada conexao e aberta uma vez so, mesmo que varios dashboards a usem.
     for conexao_id, grupo in por_conexao.items():
         conexao = await sessao.scalar(
             select(ConexaoDb).where(
@@ -74,7 +72,7 @@ async def _montar(
             for indicador in grupo:
                 saida[indicador.id] = _vazio(indicador, "conexão sem tabela fato", None)
             continue
-        nomes.append(conexao.nome)
+        nomes[conexao_id] = conexao.nome
         calculados, _ = derivar(await campos(sessao, conexao_id))
         try:
             valores = await consultar(
@@ -101,14 +99,21 @@ async def _montar(
                 conexao=conexao.nome,
             )
 
-    return Dashboard(
-        id=linha.id,
-        nome=linha.nome,
-        descricao=linha.descricao,
-        criado_em=linha.criado_em,
-        indicadores=[saida[i.id] for i in indicadores if i.id in saida],
-        conexoes=nomes,
-    )
+    resposta = []
+    for linha in linhas:
+        ids = [i for i in vinculos[linha.id] if i in saida]
+        usadas = dict.fromkeys(por_id[i].conexao_id for i in ids)
+        resposta.append(
+            Dashboard(
+                id=linha.id,
+                nome=linha.nome,
+                descricao=linha.descricao,
+                criado_em=linha.criado_em,
+                indicadores=[saida[i] for i in ids],
+                conexoes=[nomes[c] for c in usadas if c in nomes],
+            )
+        )
+    return resposta
 
 
 def _vazio(indicador: IndicadorDb, erro: str, nome: str | None) -> ItemDashboard:
@@ -134,7 +139,7 @@ async def listar(
             .order_by(DashboardDb.criado_em.desc())
         )
     )
-    return [await _montar(sessao, organizacao_id, linha, janela) for linha in linhas]
+    return await _montar_todos(sessao, organizacao_id, linhas, janela)
 
 
 @router.post("", response_model=Dashboard, status_code=201)
