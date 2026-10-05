@@ -3,11 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { mesmaOrigem } from "@/lib/origem";
 
 // Na Vercel o backend responde em /api, no mesmo dominio.
+const DOMINIO =
+  process.env.VERCEL_ENV === "production"
+    ? process.env.VERCEL_PROJECT_PRODUCTION_URL
+    : process.env.VERCEL_URL;
 const BACKEND = (
   process.env.BACKEND_URL ??
-  (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/api`
-    : "http://127.0.0.1:8000")
+  (DOMINIO ? `https://${DOMINIO}/api` : "http://127.0.0.1:8000")
 ).replace(/\/$/, "");
 
 // Maior que o teto de 20s por chamada da LLM, senao o proxy aborta antes.
@@ -33,6 +35,8 @@ async function repassar(
   if (!session) return erro(401, "sessão expirada, faça login de novo");
 
   const { caminho } = await contexto.params;
+  if (caminho.some((s) => s === "" || s === "." || s === ".."))
+    return erro(404, "não encontrado");
   const alvo = `${BACKEND}/${caminho.map(encodeURIComponent).join("/")}${request.nextUrl.search}`;
   const corpo = escrita ? await request.arrayBuffer() : null;
 

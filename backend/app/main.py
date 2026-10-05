@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -25,7 +26,15 @@ registro = logging.getLogger("kpi")
 
 conferir_ambiente()
 
-app = FastAPI(title="KPI Builder API", version="0.1.0")
+# Em producao o /api e publico: sem pagina de documentacao nem esquema.
+_producao = os.environ.get("VERCEL_ENV") == "production"
+app = FastAPI(
+    title="KPI Builder API",
+    version="0.1.0",
+    docs_url=None if _producao else "/docs",
+    redoc_url=None if _producao else "/redoc",
+    openapi_url=None if _producao else "/openapi.json",
+)
 
 
 @app.middleware("http")

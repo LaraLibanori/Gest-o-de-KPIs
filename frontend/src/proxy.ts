@@ -15,7 +15,11 @@ export async function proxy(request: NextRequest) {
           lista.forEach(({ name, value }) => request.cookies.set(name, value));
           resposta = NextResponse.next({ request });
           lista.forEach(({ name, value, options }) =>
-            resposta.cookies.set(name, value, { ...options, httpOnly: true }),
+            resposta.cookies.set(name, value, {
+              ...options,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+            }),
           );
         },
       },

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { mesmaOrigem } from "@/lib/origem";
+import { excedeu } from "@/lib/tentativas";
 
 export async function POST(request: NextRequest) {
   if (!mesmaOrigem(request))
@@ -16,6 +17,14 @@ export async function POST(request: NextRequest) {
     typeof senha !== "string"
   )
     return NextResponse.json({ mensagem: "dados inválidos" }, { status: 400 });
+
+  // Atras da Vercel todos chegam ao Supabase pelo mesmo IP, entao o limite fica aqui.
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "";
+  if (excedeu(`ip:${ip}`, 30) || excedeu(`email:${email.toLowerCase()}`, 8))
+    return NextResponse.json(
+      { codigo: "over_request_rate_limit", mensagem: "" },
+      { status: 429 },
+    );
 
   const supabase = await createClient();
   const { error } =

@@ -13,7 +13,11 @@ export async function createClient() {
         setAll: (list) => {
           try {
             list.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, { ...options, httpOnly: true }),
+              cookieStore.set(name, value, {
+                ...options,
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+              }),
             );
           } catch {
             // Server Component não escreve cookie; o proxy renova a sessão.
