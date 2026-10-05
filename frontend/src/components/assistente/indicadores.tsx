@@ -77,7 +77,7 @@ function Frase({
   onCancelar,
 }: {
   campos: Campo[];
-  onCriar: (novo: IndicadorNovo) => Promise<void>;
+  onCriar: (novo: IndicadorNovo) => Promise<boolean>;
   onCancelar: () => void;
 }) {
   const [agregacao, setAgregacao] = useState<Agregacao>("soma");
@@ -98,6 +98,7 @@ function Frase({
   const falta = papeis.length > 0 && !coluna;
 
   async function salvar() {
+    if (salvando) return;
     setSalvando(true);
     try {
       await onCriar({
@@ -118,7 +119,10 @@ function Frase({
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Select
           value={agregacao}
-          onValueChange={(v) => setAgregacao(v as Agregacao)}
+          onValueChange={(v) => {
+            setAgregacao(v as Agregacao);
+            setColuna(null);
+          }}
         >
           <SelectTrigger size="sm" className="w-auto min-w-28">
             <SelectValue />
@@ -209,9 +213,9 @@ export default function PassoIndicadores({
   onTrocarColuna: (indicador: Indicador, coluna: string | null) => void;
   onTrocarGrafico: (indicador: Indicador, grafico: Grafico) => void;
   onRemover: (indicador: Indicador, forcar?: boolean) => void;
-  conflito: { nome: string; texto: string } | null;
+  conflito: { id: string; nome: string; texto: string } | null;
   onFecharConflito: () => void;
-  onCriar: (novo: IndicadorNovo) => Promise<void>;
+  onCriar: (novo: IndicadorNovo) => Promise<boolean>;
   rotuloCancelar: string;
   onVoltar: () => void;
   onFechar: () => void;
@@ -265,6 +269,7 @@ export default function PassoIndicadores({
                     size="icon"
                     variant="ghost"
                     className="size-7"
+                    aria-label={`Remover ${i.nome}`}
                     onClick={() => setARemover(i)}
                   >
                     <X className="size-3.5" />
@@ -320,8 +325,9 @@ export default function PassoIndicadores({
         <Frase
           campos={campos}
           onCriar={async (novo) => {
-            await onCriar(novo);
-            setCriando(false);
+            const ok = await onCriar(novo);
+            if (ok) setCriando(false);
+            return ok;
           }}
           onCancelar={() => setCriando(false)}
         />
@@ -362,11 +368,8 @@ export default function PassoIndicadores({
         acao="Remover assim mesmo"
         fecharAoConfirmar={false}
         onConfirmar={() => {
-          if (conflito)
-            onRemover(
-              indicadores.find((i) => i.nome === conflito.nome)!,
-              true,
-            );
+          const alvo = indicadores.find((i) => i.id === conflito?.id);
+          if (alvo) onRemover(alvo, true);
           onFecharConflito();
         }}
         onFechar={onFecharConflito}
@@ -374,7 +377,7 @@ export default function PassoIndicadores({
 
       <Confirmar
         aberto={aRemover !== null}
-        titulo={`Remover ${aRemover?.nome}?`}
+        titulo={`Remover ${aRemover?.nome ?? "o indicador"}?`}
         descricao="O indicador sai desta conexão. Dá para montar de novo depois, pelo botão de adicionar ou refazendo a proposta."
         acao="Remover"
         onConfirmar={() => {

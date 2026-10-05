@@ -112,6 +112,7 @@ export default function Assistente({
   const [testando, setTestando] = useState(false);
   const [descartando, setDescartando] = useState(false);
   const [conflito, setConflito] = useState<{
+    id: string;
     nome: string;
     texto: string;
   } | null>(null);
@@ -304,6 +305,7 @@ export default function Assistente({
 
   async function escolherTabela(relacao: Relacao) {
     if (!atual || ocupado) return;
+    const trocou = !!atual.tabela_fato && atual.tabela_fato !== relacao.nome;
     setOcupado(true);
     try {
       setAtual(
@@ -316,6 +318,11 @@ export default function Assistente({
           }),
         }),
       );
+      if (trocou) {
+        setCampos([]);
+        setIndicadores([]);
+        setVisitados([0, 1]);
+      }
       irPara("negocio");
     } catch (e) {
       falhar(e);
@@ -332,7 +339,13 @@ export default function Assistente({
           method: "POST",
           llm: true,
         });
-        if (r.aplicadas > 0) setCampos(r.campos);
+        if (r.aplicadas > 0)
+          setCampos((lista) =>
+            lista.map((c) => {
+              const novo = r.campos.find((n) => n.id === c.id);
+              return novo && !c.confirmado ? novo : c;
+            }),
+          );
       } catch {
         // sem sugestao o catalogo por regra continua valendo
       } finally {
@@ -390,6 +403,11 @@ export default function Assistente({
     irPara("indicadores");
     setOcupado(true);
     try {
+      setCampos(
+        await api<Campo[]>(`${base}/${atual.id}/catalogo/confirmar`, {
+          method: "POST",
+        }),
+      );
       const p = await api<Proposta>(`${base}/${atual.id}/indicadores/propor`, {
         method: "POST",
       });
@@ -478,23 +496,29 @@ export default function Assistente({
     } catch (e) {
       setIndicadores(antes);
       if (e instanceof Conflito) {
-        setConflito({ nome: indicador.nome, texto: e.message });
+        setConflito({
+          id: indicador.id,
+          nome: indicador.nome,
+          texto: e.message,
+        });
         return;
       }
       falhar(e);
     }
   }
 
-  async function criarIndicador(novo: IndicadorNovo) {
-    if (!atual) return;
+  async function criarIndicador(novo: IndicadorNovo): Promise<boolean> {
+    if (!atual) return false;
     try {
       const criado = await api<Indicador>(`${base}/${atual.id}/indicadores`, {
         method: "POST",
         body: JSON.stringify(novo),
       });
       setIndicadores((lista) => [...lista, criado]);
+      return true;
     } catch (e) {
       falhar(e);
+      return false;
     }
   }
 

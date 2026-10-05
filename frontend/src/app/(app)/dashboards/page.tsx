@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LayoutDashboard, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, type Dashboard, type Janela } from "@/lib/api";
-import { curto } from "@/lib/numero";
 import ControleJanela from "@/components/painel/janela";
 import { Cabecalho, Pagina } from "@/components/pagina";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,18 +54,27 @@ export default function Dashboards() {
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
+  const pedido = useRef(0);
+
   const base = aberta ? `/organizacoes/${aberta.id}/dashboards` : null;
 
   const carregar = useCallback(async () => {
-    if (!base) return;
+    if (!base) {
+      setCarregando(false);
+      return;
+    }
+    const meu = ++pedido.current;
     setCarregando(true);
     try {
-      setLista(await api<Dashboard[]>(`${base}?janela=${janela}`));
+      const nova = await api<Dashboard[]>(`${base}?janela=${janela}`);
+      if (meu !== pedido.current) return;
+      setLista(nova);
       setErro(null);
     } catch (e) {
+      if (meu !== pedido.current) return;
       setErro(e instanceof Error ? e.message : "não foi possível carregar");
     } finally {
-      setCarregando(false);
+      if (meu === pedido.current) setCarregando(false);
     }
   }, [base, janela]);
 
@@ -118,35 +127,47 @@ export default function Dashboards() {
                     Depois é só escolher quais indicadores entram nele.
                   </DialogDescription>
                 </DialogHeader>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="nome">Nome</FieldLabel>
-                    <Input
-                      id="nome"
-                      value={nome}
-                      placeholder="Vendas da loja"
-                      onChange={(e) => setNome(e.target.value)}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="descricao">Descrição</FieldLabel>
-                    <Input
-                      id="descricao"
-                      value={descricao}
-                      placeholder="Opcional"
-                      onChange={(e) => setDescricao(e.target.value)}
-                    />
-                  </Field>
-                  {erroForm && <FieldError>{erroForm}</FieldError>}
-                </FieldGroup>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setAberto(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={criar} disabled={salvando || !nome.trim()}>
-                    {salvando ? "Criando..." : "Criar"}
-                  </Button>
-                </DialogFooter>
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (nome.trim() && !salvando) criar();
+                  }}
+                >
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="nome">Nome</FieldLabel>
+                      <Input
+                        id="nome"
+                        value={nome}
+                        placeholder="Vendas da loja"
+                        onChange={(e) => setNome(e.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="descricao">Descrição</FieldLabel>
+                      <Input
+                        id="descricao"
+                        value={descricao}
+                        placeholder="Opcional"
+                        onChange={(e) => setDescricao(e.target.value)}
+                      />
+                    </Field>
+                    {erroForm && <FieldError>{erroForm}</FieldError>}
+                  </FieldGroup>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setAberto(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={salvando || !nome.trim()}>
+                      {salvando ? "Criando..." : "Criar"}
+                    </Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
           </>
@@ -154,9 +175,9 @@ export default function Dashboards() {
       />
 
       {erro && (
-        <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
-          {erro}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{erro}</AlertDescription>
+        </Alert>
       )}
 
       {carregando ? (
@@ -211,7 +232,7 @@ export default function Dashboards() {
                   <CardDescription>
                     {d.descricao ??
                       (d.conexoes.length
-                        ? `de ${d.conexoes.length} conexão${d.conexoes.length > 1 ? "ões" : ""}`
+                        ? `de ${d.conexoes.length} ${d.conexoes.length > 1 ? "conexões" : "conexão"}`
                         : "sem indicador ainda")}
                   </CardDescription>
                 </CardHeader>
@@ -226,8 +247,7 @@ export default function Dashboards() {
                     <p className="text-muted-foreground text-xs">
                       {d.indicadores.length} indicador
                       {d.indicadores.length > 1 ? "es" : ""} · {comValor.length}{" "}
-                      com valor ·{" "}
-                      {curto(comValor.reduce((s, i) => s + (i.valor ?? 0), 0))}
+                      com valor
                     </p>
                   )}
                 </CardContent>

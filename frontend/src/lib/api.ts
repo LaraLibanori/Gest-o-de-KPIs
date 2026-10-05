@@ -11,6 +11,11 @@ export class Conflito extends Error {
   readonly status = 409;
 }
 
+function sessaoExpirada(): never {
+  if (typeof window !== "undefined") window.location.assign("/login");
+  throw new Error("sessão expirada, faça login de novo");
+}
+
 export async function api<T>(
   path: string,
   init?: RequestInit & { llm?: boolean },
@@ -21,7 +26,7 @@ export async function api<T>(
     data: { session },
   } = await supabase.auth.getSession();
 
-  if (!session) throw new Error("sessão expirada, faça login de novo");
+  if (!session) sessaoExpirada();
 
   let res: Response;
   try {
@@ -38,6 +43,8 @@ export async function api<T>(
     // Estouro de tempo ou rede fora: a mensagem crua do navegador não ajuda.
     throw new Error("o servidor não respondeu, tente de novo");
   }
+
+  if (res.status === 401) sessaoExpirada();
 
   // 409 e conflito de estado: a tela precisa perguntar, nao só mostrar erro.
   if (res.status === 409) throw new Conflito(await mensagem(res));

@@ -124,7 +124,11 @@ export default function Shell({
   }
 
   const aberta = organizacoes.find((o) => o.id === abertaId) ?? null;
-  const pagina = NAVEGACAO.find((n) => n.href === caminho);
+  const ativo = (href: string) =>
+    href === "/"
+      ? caminho === "/" || caminho.startsWith("/conexoes")
+      : caminho.startsWith(href);
+  const pagina = NAVEGACAO.find((n) => ativo(n.href));
   const contexto = useMemo(
     () => ({ email, organizacoes, aberta, carregando, recarregar }),
     [email, organizacoes, aberta, carregando, recarregar],
@@ -194,7 +198,7 @@ export default function Shell({
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
                         asChild
-                        isActive={caminho === item.href}
+                        isActive={ativo(item.href)}
                         tooltip={item.titulo}
                       >
                         <Link href={item.href}>

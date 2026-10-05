@@ -46,6 +46,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { paineis } from "@/lib/paineis";
 
 function quando(iso: string | null) {
   if (!iso) return "nunca verificada";
@@ -132,6 +133,7 @@ export default function Conexoes() {
       await api<void>(`/organizacoes/${aberta.id}/conexoes/${apagando.id}`, {
         method: "DELETE",
       });
+      paineis.clear();
       setConexoes((lista) => lista.filter((c) => c.id !== apagando.id));
       toast.success(`${apagando.nome} removida`);
     } catch (e) {
@@ -143,7 +145,9 @@ export default function Conexoes() {
 
   function fecharAssistente(mudou: boolean) {
     setAssistente({ ativo: false, alvo: null, editar: false });
-    if (mudou && aberta) carregar(aberta.id);
+    if (!mudou) return;
+    paineis.clear();
+    if (aberta) carregar(aberta.id);
   }
 
   const abrir = (alvo: Conexao | null, editar = false) =>
@@ -323,7 +327,7 @@ export default function Conexoes() {
 
       <Confirmar
         aberto={apagando !== null}
-        titulo={`Apagar ${apagando?.nome}?`}
+        titulo={`Apagar ${apagando?.nome ?? "a conexão"}?`}
         descricao="A credencial guardada é descartada. O banco da empresa não é alterado, mas os indicadores que dependem dessa conexão param."
         onConfirmar={apagar}
         onFechar={() => setApagando(null)}

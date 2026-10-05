@@ -141,7 +141,7 @@ export default function Configuracoes() {
 
       <Confirmar
         aberto={apagando}
-        titulo={`Apagar ${aberta?.nome}?`}
+        titulo={`Apagar ${aberta?.nome ?? "a organização"}?`}
         descricao="A organização, seus membros, convites e conexões são removidos. Não dá para desfazer."
         onConfirmar={apagar}
         onFechar={() => setApagando(false)}

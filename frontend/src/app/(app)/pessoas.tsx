@@ -50,6 +50,7 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useOrganizacao } from "./contexto";
 
 type Alvo = { titulo: string; descricao: string; acao: () => Promise<void> };
 
@@ -71,6 +72,7 @@ export default function Pessoas({
   const [convidando, setConvidando] = useState(false);
   const [aberto, setAberto] = useState(false);
   const [alvo, setAlvo] = useState<Alvo | null>(null);
+  const { recarregar } = useOrganizacao();
 
   const souDono = organizacao.papel === "dono";
 
@@ -139,6 +141,7 @@ export default function Pessoas({
           lista.filter((m) => m.usuario_id !== membro.usuario_id),
         );
         toast.success(sou ? "Você saiu da organização" : "Pessoa removida");
+        if (sou) await recarregar();
       },
     });
   }

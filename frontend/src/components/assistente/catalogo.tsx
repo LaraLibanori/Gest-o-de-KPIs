@@ -3,6 +3,7 @@
 import { ArrowLeft, Hash, Sparkles, Type } from "lucide-react";
 import type { Campo, PapelCampo } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -27,10 +28,15 @@ const COR: Record<PapelCampo, string> = {
   ignorar: "text-muted-foreground",
 };
 
-const NUMERICA = /int|num|real|double|money|serial/;
+const NUMERICA = /^(smallint|integer|bigint|numeric|decimal|real|double|money)/;
+const IDENTIFICADOR = /^id$|^id_|_id$/i;
 
 function numerica(c: Campo) {
   return NUMERICA.test(c.tipo);
+}
+
+function esquecida(c: Campo) {
+  return c.papel === "ignorar" && numerica(c) && !IDENTIFICADOR.test(c.coluna);
 }
 
 export default function PassoCatalogo({
@@ -61,9 +67,7 @@ export default function PassoCatalogo({
   const dimensoes = contagem("dimensao");
   const tempos = contagem("tempo");
   const semTempo = tempos === 0;
-  const numericasSemPapel = campos.filter(
-    (c) => c.papel === "ignorar" && numerica(c),
-  ).length;
+  const numericasSemPapel = campos.filter(esquecida).length;
   const plural = (n: number, um: string, muitos: string) =>
     `${n} ${n === 1 ? um : muitos}`;
 
@@ -103,16 +107,15 @@ export default function PassoCatalogo({
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
           <p className="text-xs">
             {numericasSemPapel} coluna{numericasSemPapel === 1 ? "" : "s"}{" "}
-            numérica{numericasSemPapel === 1 ? "" : "s"} está{""}
-            {numericasSemPapel === 1 ? "" : "m"} ignorada
-            {numericasSemPapel === 1 ? "" : "s"}.
+            numérica{numericasSemPapel === 1 ? "" : "s"}{" "}
+            {numericasSemPapel === 1 ? "está ignorada" : "estão ignoradas"}.
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() =>
               campos
-                .filter((c) => c.papel === "ignorar" && numerica(c))
+                .filter(esquecida)
                 .forEach((c) => onMudarPapel(c, "metrica"))
             }
           >
@@ -152,11 +155,16 @@ export default function PassoCatalogo({
                     ` · ${c.cardinalidade.toLocaleString("pt-BR")} valores`}
                 </p>
               </div>
+              {!c.confirmado && <Badge variant="outline">sugerido</Badge>}
               <Select
                 value={c.papel}
                 onValueChange={(v) => onMudarPapel(c, v as PapelCampo)}
               >
-                <SelectTrigger className={cn("w-32", COR[c.papel])} size="sm">
+                <SelectTrigger
+                  className={cn("w-32", COR[c.papel])}
+                  size="sm"
+                  aria-label={`Papel de ${c.rotulo ?? c.coluna}`}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -181,8 +189,11 @@ export default function PassoCatalogo({
           {rotuloCancelar}
         </Button>
         <div className="flex-1" />
-        <Button onClick={onAvancar} disabled={ocupado || campos.length === 0}>
-          Montar indicadores
+        <Button
+          onClick={onAvancar}
+          disabled={ocupado || sugerindo || campos.length === 0}
+        >
+          Confirmar e montar indicadores
         </Button>
       </div>
     </div>
