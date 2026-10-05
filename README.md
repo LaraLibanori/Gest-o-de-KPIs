@@ -57,7 +57,8 @@ indicadores            indicadores da conexão, já ligados às colunas
 ```
 
 O schema `exemplo` tem uma base fictícia que faz o papel de banco do cliente,
-com um usuário de leitura à parte. `make exemplo` cria.
+com um usuário de leitura à parte. `make exemplo` cria. `make taxas` mostra o quanto
+a regra e o modelo acertaram dos papéis que o usuário confirmou.
 
 Tudo pendura na organização, não no usuário. É assim que duas pessoas veem os
 mesmos dados.

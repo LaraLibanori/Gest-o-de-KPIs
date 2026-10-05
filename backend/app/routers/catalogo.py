@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from ..auth import CurrentUser
 from ..db import Sessao
@@ -11,6 +11,7 @@ from ..models import Campo as CampoDb
 from ..permissoes import exigir_dono, papel
 from ..schemas import Campo, CampoIn, Sugestao
 from .comum import PREFIXO, buscar, consultar
+from .comum import campos as campos_da
 
 router = APIRouter(prefix=PREFIXO, tags=["catálogo"])
 
@@ -36,12 +37,24 @@ async def montar_catalogo(
     if not conexao.tabela_fato:
         raise HTTPException(409, "escolha a tabela fato antes")
 
-    campos = await consultar(
+    campos_lidos = await consultar(
         conexao, lambda externa: ler_catalogo(externa, conexao.tabela_fato)
     )
 
-    await sessao.execute(delete(CampoDb).where(CampoDb.conexao_id == conexao_id))
-    sessao.add_all([CampoDb(conexao_id=conexao_id, **c) for c in campos])
+    atuais = {c.coluna: c for c in await campos_da(sessao, conexao_id)}
+    lidas = {c["coluna"] for c in campos_lidos}
+    for coluna, campo in atuais.items():
+        if not campo.formula and coluna not in lidas:
+            await sessao.delete(campo)
+    for c in campos_lidos:
+        campo = atuais.get(c["coluna"])
+        if campo is None:
+            sessao.add(CampoDb(conexao_id=conexao_id, papel_regra=c["papel"], **c))
+            continue
+        campo.tipo = c["tipo"]
+        campo.cardinalidade = c["cardinalidade"]
+        campo.papel_regra = c["papel"]
+        campo.ordem = c["ordem"]
     conexao.etapa = "catalogo"
     await sessao.flush()
     linhas = await sessao.scalars(
@@ -58,27 +71,34 @@ async def sugerir_rotulos(
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "sugerir rótulos")
     conexao = await buscar(sessao, organizacao_id, conexao_id)
-    campos = list(
-        await sessao.scalars(
-            select(CampoDb)
-            .where(CampoDb.conexao_id == conexao_id)
-            .order_by(CampoDb.ordem)
-        )
-    )
+    campos = await campos_da(sessao, conexao_id)
 
     sugestoes = await sugerir(
         [
             {"coluna": c.coluna, "tipo": c.tipo, "cardinalidade": c.cardinalidade}
             for c in campos
+            if not c.formula
         ],
         conexao.tabela_fato or "",
         conexao.descricao_negocio,
     )
 
+    # A llm demora; relê para não sobrescrever o que foi confirmado nesse meio tempo.
+    campos = list(
+        await sessao.scalars(
+            select(CampoDb)
+            .where(CampoDb.conexao_id == conexao_id)
+            .order_by(CampoDb.ordem)
+            .execution_options(populate_existing=True)
+        )
+    )
     aplicadas = 0
     for campo in campos:
         sugestao = sugestoes.get(campo.coluna)
-        if not sugestao or campo.confirmado:
+        if not sugestao or campo.formula:
+            continue
+        campo.papel_modelo = sugestao.papel
+        if campo.confirmado:
             continue
         campo.rotulo = sugestao.rotulo
         campo.papel = sugestao.papel

@@ -6,7 +6,7 @@ AMOSTRA = 5000
 # Continuo e sempre metrica: dinheiro tem valor quase unico por natureza.
 CONTINUOS = ("numeric", "decimal", "real", "double", "money")
 INTEIROS = ("smallint", "integer", "bigint")
-TEMPO = ("date", "timestamp", "time")
+TEMPO = ("date", "timestamp")
 
 # Acima disso a coluna e identificador; abaixo daquilo, serve de dimensao.
 PROPORCAO_IDENTIFICADOR = 0.95
@@ -127,12 +127,15 @@ async def _cardinalidades(
 
 
 def identificador(coluna: str) -> bool:
-    return coluna == "id" or coluna.startswith("id_") or coluna.endswith("_id")
+    nome = coluna.lower()
+    return nome == "id" or nome.startswith("id_") or nome.endswith("_id")
 
 
 def classificar(
     coluna: str, tipo: str, cardinalidade: int | None, linhas: float | None
 ) -> str:
+    if tipo.endswith(("[]", "range")):
+        return "ignorar"
     if tipo.startswith(TEMPO):
         return "tempo"
     if identificador(coluna):
