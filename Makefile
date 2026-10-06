@@ -33,14 +33,15 @@ VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY NVIDIA_API_KEY OPENROUTER_
 # Le o arquivo de ambiente ignorando o \r que o Windows deixa no fim da linha.
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a
 
-.PHONY: ajuda env-init instalar dev dev-front dev-back checar checar-front checar-back \
+.PHONY: ajuda env-init instalar dev dev-front dev-back checar checar-front checar-back auditar \
 	env env-front env-back migrar migracao migracoes exemplo moda taxas testes lint preview producao testar portas limpar
 
 ajuda:
 	@echo "make env-init   cria os .env a partir dos exemplos"
 	@echo "make instalar   instala as dependencias do front e do back"
 	@echo "make dev        sobe os dois locais (front :$(PORTA_FRONT), back :$(PORTA_BACK))"
-	@echo "make checar     lint, typecheck e build, igual ao CI"
+	@echo "make checar     lint, typecheck, build e bandit, igual ao CI"
+	@echo "make auditar    npm audit nas dependencias de producao"
 	@echo "make testes     roda os testes do backend (precisa de um Postgres vazio)"
 	@echo "make migrar     aplica as migrations pendentes no banco"
 	@echo "make migracao m=\"texto\"   cria uma migration a partir do models.py"
@@ -141,8 +142,14 @@ checar-front:
 	cd frontend && npm run build
 	cd frontend && npx tsc --noEmit
 
+# Falha em vulnerabilidade alta ou critica nas dependencias de producao.
+auditar:
+	cd frontend && npm audit --omit=dev --audit-level=high
+
+# B608 fica de fora: o SQL do banco do cliente nao tem como ser parametrizado.
 # So confere que importa, entao os valores de ambiente nao precisam ser reais.
 checar-back:
+	cd backend && "$(PY)" -m bandit -r app -ll -q -s B608
 	cd backend && SUPABASE_URL=x DATABASE_URL=x APP_SECRET_KEY=x "$(PY)" -c "import app.main"
 
 # Cadastra em producao e em preview, sobrescrevendo o que ja existir.
