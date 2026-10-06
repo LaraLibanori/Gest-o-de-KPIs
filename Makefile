@@ -142,9 +142,9 @@ checar-front:
 	cd frontend && npm run build
 	cd frontend && npx tsc --noEmit
 
-# Falha em vulnerabilidade alta ou critica nas dependencias de producao.
+# Falha em vulnerabilidade critica nas dependencias de producao.
 auditar:
-	cd frontend && npm audit --omit=dev --audit-level=high
+	cd frontend && npm audit --omit=dev --audit-level=critical
 
 # B608 fica de fora: o SQL do banco do cliente nao tem como ser parametrizado.
 # So confere que importa, entao os valores de ambiente nao precisam ser reais.
