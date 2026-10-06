@@ -1,3 +1,4 @@
+import hmac
 import logging
 import os
 import uuid
@@ -37,9 +38,21 @@ app = FastAPI(
 )
 
 
+SEGREDO_SERVIDOR = os.environ.get("SEGREDO_SERVIDOR", "")
+
+
+# Só o servidor do Next chama a API: sem o segredo, o /api público nem existe.
 @app.middleware("http")
 async def identificar(request: Request, chamar):
     request.state.pedido = uuid.uuid4().hex[:8]
+    if SEGREDO_SERVIDOR and request.url.path != "/health":
+        enviado = request.headers.get("x-segredo-servidor", "")
+        if not hmac.compare_digest(enviado.encode(), SEGREDO_SERVIDOR.encode()):
+            return JSONResponse(
+                {"detail": "Not Found"},
+                status_code=404,
+                headers={"X-Request-Id": request.state.pedido},
+            )
     resposta = await chamar(request)
     resposta.headers["X-Request-Id"] = request.state.pedido
     return resposta

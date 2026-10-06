@@ -46,6 +46,7 @@ async function repassar(
       method: request.method,
       headers: {
         Authorization: `Bearer ${session.access_token}`,
+        "X-Segredo-Servidor": process.env.SEGREDO_SERVIDOR ?? "",
         "Content-Type": "application/json",
       },
       body: corpo && corpo.byteLength > 0 ? corpo : undefined,
