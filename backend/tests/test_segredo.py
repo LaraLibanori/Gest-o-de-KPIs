@@ -15,6 +15,7 @@ async def test_com_segredo_definido_a_api_publica_nao_existe(banco, monkeypatch)
         await _chamar("/perfil", {"x-segredo-servidor": "errado"})
     ).status_code == 404
     assert (await _chamar("/health")).status_code == 200
+    assert (await _chamar("/ready")).status_code != 404
 
 
 async def test_com_o_segredo_certo_a_chamada_chega_na_autenticacao(banco, monkeypatch):

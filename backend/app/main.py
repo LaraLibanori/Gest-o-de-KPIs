@@ -44,7 +44,7 @@ SEGREDO_SERVIDOR = os.environ.get("SEGREDO_SERVIDOR", "")
 @app.middleware("http")
 async def identificar(request: Request, chamar):
     request.state.pedido = uuid.uuid4().hex[:8]
-    if SEGREDO_SERVIDOR and request.url.path != "/health":
+    if SEGREDO_SERVIDOR and request.url.path not in ("/health", "/ready"):
         enviado = request.headers.get("x-segredo-servidor", "")
         if not hmac.compare_digest(enviado.encode(), SEGREDO_SERVIDOR.encode()):
             return JSONResponse(
