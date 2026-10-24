@@ -30,12 +30,12 @@ values
   ('MOD-CAM-002', 'Boreal',  'Camisas',    'Manga curta',  'P',     'Listra',    149.90,  45.30, 71, date '2023-02-01'),
   ('MOD-CAL-001', 'Cerrado', 'Calçados',   'Tênis',        '40',    'Branco',    429.90, 158.20, 33, date '2023-03-01'),
   ('MOD-CAL-002', 'Cerrado', 'Calçados',   'Bota',         '38',    'Preto',     499.90, 189.40, 19, date '2023-09-01'),
-  ('MOD-BOL-001', 'Duna',    'Boletas',    'Mala',         'M',     'Caramelo',  259.90,  88.60, 47, date '2023-01-01'),
-  ('MOD-BOL-002', 'Duna',    'Boletas',    'Bolsa de mão', 'G',     'Preto',     229.90,  77.90, 52, date '2023-04-01'),
+  ('MOD-BOL-001', 'Duna',    'Bolsas',    'Mala',         'M',     'Caramelo',  259.90,  88.60, 47, date '2023-01-01'),
+  ('MOD-BOL-002', 'Duna',    'Bolsas',    'Bolsa de mão', 'G',     'Preto',     229.90,  77.90, 52, date '2023-04-01'),
   ('MOD-ACD-001', 'Aurora',  'Acessórios', 'Bolsa',        'Único', 'Marrom',    319.90, 104.30, 26, date '2023-01-01'),
   ('MOD-ACD-002', 'Boreal',  'Acessórios', 'Cinto',        'M',     'Preto',      89.90,  24.70, 88, date '2023-01-01'),
   ('MOD-ACD-003', 'Duna',    'Acessórios', 'Lenço',        'Único', 'Estampado',  79.90,  19.80, 94, date '2023-05-01'),
-  ('MOD-JOA-001', 'Cerrado', 'Jojias',     'Colar',        'Único', 'Ouro',      189.90,  58.40, 31, date '2023-06-01'),
+  ('MOD-JOA-001', 'Cerrado', 'Joias',     'Colar',        'Único', 'Ouro',      189.90,  58.40, 31, date '2023-06-01'),
   ('MOD-ROU-001', 'Aurora',  'Roupões',    'Plush',        'G',     'Cinza',     379.90, 141.20, 15, date '2023-10-01'),
   ('MOD-ROU-002', 'Boreal',  'Roupões',    'Cardigã',      'P',     'Areia',     299.90, 112.50, 22, date '2023-08-01');
 
