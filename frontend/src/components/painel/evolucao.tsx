@@ -1,6 +1,13 @@
 "use client";
 
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { Quebra } from "@/lib/api";
 import { cheio, eixo } from "@/lib/numero";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -33,6 +40,7 @@ export default function Evolucao({
   const mensal =
     validos.length > 2 && validos.every((p) => p.rotulo.endsWith("-01"));
   const rotuloDe = mensal ? rotuloMes : rotuloDia;
+  const comAnterior = validos.some((p) => p.anterior != null);
 
   if (validos.length < 2)
     return carregando ? (
@@ -45,11 +53,32 @@ export default function Evolucao({
 
   return (
     <div>
+      {comAnterior && (
+        <div className="text-muted-foreground mb-2 flex flex-wrap items-center gap-4 text-xs">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="bg-chart-1 h-0.5 w-4 rounded" />
+            Período atual
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="border-muted-foreground w-4 border-t-2 border-dashed" />
+            Mesmo período antes
+          </span>
+        </div>
+      )}
       <ChartContainer
-        config={{ valor: { label: rotulo, color: "var(--chart-1)" } }}
+        config={{
+          valor: {
+            label: comAnterior ? "Período atual" : rotulo,
+            color: "var(--chart-1)",
+          },
+          anterior: {
+            label: "Mesmo período antes",
+            color: "var(--muted-foreground)",
+          },
+        }}
         className="aspect-auto h-72 w-full"
       >
-        <AreaChart data={validos} margin={{ left: 4, right: 12, top: 8 }}>
+        <ComposedChart data={validos} margin={{ left: 4, right: 12, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 4" />
           <XAxis
             dataKey="rotulo"
@@ -70,8 +99,21 @@ export default function Evolucao({
             content={
               <ChartTooltipContent
                 labelFormatter={(v) => rotuloDe(String(v))}
-                formatter={(v) => cheio(Number(v), moeda)}
-                hideIndicator
+                formatter={(v, nome) => (
+                  <span className="flex w-full justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {nome === "anterior"
+                        ? "Mesmo período antes"
+                        : comAnterior
+                          ? "Período atual"
+                          : rotulo}
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {cheio(Number(v), moeda)}
+                    </span>
+                  </span>
+                )}
+                hideIndicator={!comAnterior}
               />
             }
           />
@@ -84,7 +126,19 @@ export default function Evolucao({
             strokeWidth={2}
             isAnimationActive={false}
           />
-        </AreaChart>
+          {comAnterior && (
+            <Line
+              dataKey="anterior"
+              type="monotone"
+              stroke="var(--color-anterior)"
+              strokeOpacity={0.7}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+              dot={false}
+              isAnimationActive={false}
+            />
+          )}
+        </ComposedChart>
       </ChartContainer>
 
       {cortar && (

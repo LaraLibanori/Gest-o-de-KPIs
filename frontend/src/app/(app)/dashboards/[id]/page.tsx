@@ -18,7 +18,7 @@ import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
 import Destaque, { APARAR } from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
-import Tile from "@/components/painel/tile";
+import Tile, { colunas } from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
 import Confirmar from "@/components/confirmar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -266,8 +266,8 @@ export default function DetalheDoDashboard() {
               )}
               <div
                 className={cn(
-                  "grid items-stretch gap-4 sm:grid-cols-2",
-                  itens.length % 3 === 0 ? "lg:grid-cols-3" : "xl:grid-cols-4",
+                  "grid items-stretch gap-4",
+                  colunas(itens.length),
                 )}
               >
                 {itens.map((i) => (

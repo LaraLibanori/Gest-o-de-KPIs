@@ -22,6 +22,20 @@ const REAL_INTEIRO = new Intl.NumberFormat("pt-BR", {
 const DINHEIRO =
   /valor|preco|preço|receita|faturamento|custo|desconto|ticket|frete|lucro|margem_bruta/i;
 
+const RUINS_SE_SOBEM =
+  /custo|desconto|cancel|devol|estorno|atraso|reclama|inadimpl|perda|churn|despesa|abandono/i;
+
+export function subirEBom(indicador: {
+  nome: string;
+  coluna: string | null;
+}): boolean {
+  return !RUINS_SE_SOBEM.test(
+    `${indicador.nome} ${indicador.coluna ?? ""}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, ""),
+  );
+}
+
 export function ehDinheiro(indicador: {
   agregacao: string;
   coluna: string | null;

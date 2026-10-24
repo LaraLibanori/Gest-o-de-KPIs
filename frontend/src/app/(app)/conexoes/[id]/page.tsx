@@ -23,7 +23,7 @@ import { humano } from "@/lib/rotulo";
 import CamposCalculados from "@/components/painel/campos";
 import Destaque, { APARAR } from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
-import Tile from "@/components/painel/tile";
+import Tile, { colunas } from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { paineis } from "@/lib/paineis";
+import { cn } from "@/lib/utils";
 import { useOrganizacao } from "../../contexto";
 
 const JANELA_INICIAL: Janela = "30d";
@@ -343,7 +344,9 @@ export default function PainelDaConexao() {
               </Alert>
             )}
 
-          <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            className={cn("grid items-stretch gap-4", colunas(todos.length))}
+          >
             {todos.map((i) => (
               <Tile
                 key={i.id}

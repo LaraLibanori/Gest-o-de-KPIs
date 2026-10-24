@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import delete, func, select
 
 from ..auth import CurrentUser
-from ..calculo import JANELA_PADRAO, calcular, compor
+from ..calculo import JANELA_PADRAO, calcular, compor, mudancas
 from ..db import Sessao
 from ..formula import FormulaInvalida, analisar, derivar
 from ..indicadores import (
@@ -13,15 +13,17 @@ from ..indicadores import (
     casar,
     formas_possiveis,
     por_regra,
+    subir_e_bom,
     sugerir_grafico,
 )
 from ..introspeccao import TEMPO, identificador
 from ..limite_llm import reservar
-from ..llm import disponivel, sugerir_graficos
+from ..llm import disponivel, resumir, sugerir_graficos
 from ..models import Campo as CampoDb
 from ..models import Dashboard as DashboardDb
 from ..models import DashboardIndicador as VinculoDb
 from ..models import Indicador as IndicadorDb
+from ..models import Segmento as SegmentoDb
 from ..models import SegmentoKpi as KpiDb
 from ..permissoes import exigir_dono, papel
 from ..schemas import (
@@ -31,15 +33,20 @@ from ..schemas import (
     CampoCalculadoPatch,
     Composicao,
     Dimensao,
+    Fator,
     Indicador,
     IndicadorCalculado,
     IndicadorEdicao,
     IndicadorIn,
+    Mudancas,
     Painel,
+    PedidoResumo,
     Proposta,
     Quebra,
+    Resumo,
     SugestaoGrafico,
 )
+from ..texto import percentual, quantia
 from .comum import PREFIXO, buscar, campos, consultar
 
 router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
@@ -622,3 +629,141 @@ async def composicao(
         total=total,
         pontos=[Quebra(**p) for p in pontos],
     )
+
+
+@router.get("/{conexao_id}/mudancas", response_model=Mudancas)
+async def o_que_mudou(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    user: CurrentUser,
+    sessao: Sessao,
+    indicador: UUID,
+    janela: JANELA = JANELA_PADRAO,
+):
+    await papel(sessao, organizacao_id, user.id)
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    if not conexao.tabela_fato:
+        raise HTTPException(409, "escolha a tabela fato antes")
+    alvo = await sessao.scalar(
+        select(IndicadorDb).where(
+            IndicadorDb.id == indicador, IndicadorDb.conexao_id == conexao_id
+        )
+    )
+    if alvo is None:
+        raise HTTPException(404, "indicador não encontrado")
+    catalogo = await campos(sessao, conexao_id)
+    dimensoes = _dimensoes(catalogo, {alvo.tempo})[:3]
+    rotulos = {d.coluna: d.rotulo for d in dimensoes}
+    calculados, _ = derivar(catalogo)
+    tabela = conexao.tabela_fato
+
+    async def comparar(externa):
+        total = await calcular(
+            externa, tabela, [alvo], janela, com_serie=False, calculados=calculados
+        )
+        fatores = await mudancas(
+            externa, tabela, alvo, list(rotulos), janela, calculados
+        )
+        return total[str(alvo.id)], fatores
+
+    total, fatores = await consultar(conexao, comparar)
+    lista = [Fator(rotulo_dimensao=rotulos[f["dimensao"]], **f) for f in fatores]
+    return Mudancas(
+        indicador=alvo.nome,
+        janela=janela,
+        valor=total.get("valor"),
+        anterior=total.get("anterior"),
+        variacao=total.get("variacao"),
+        subir_e_bom=subir_e_bom(alvo.nome, alvo.coluna),
+        subiram=sorted(
+            (f for f in lista if f.diferenca > 0), key=lambda f: -f.diferenca
+        )[:3],
+        cairam=sorted((f for f in lista if f.diferenca < 0), key=lambda f: f.diferenca)[
+            :3
+        ],
+    )
+
+
+CONTAS = {
+    "soma": "soma",
+    "media": "média por registro",
+    "contagem": "contagem de registros",
+    "distintos": "quantidade de valores diferentes",
+    "minimo": "menor valor",
+    "maximo": "maior valor",
+}
+
+PERIODOS = {
+    "7d": "últimos 7 dias, comparados aos 7 dias anteriores",
+    "30d": "últimos 30 dias, comparados aos 30 dias anteriores",
+    "90d": "últimos 90 dias, comparados aos 90 dias anteriores",
+    "12m": "últimos 12 meses, comparados aos 12 meses anteriores",
+}
+
+
+def _situacao(variacao: float | None) -> str:
+    if variacao is None:
+        return "sem período anterior para comparar"
+    if abs(variacao) < 1:
+        return "estável"
+    return "subiu" if variacao > 0 else "caiu"
+
+
+def _avaliacao(variacao: float | None, bom: bool) -> str:
+    if variacao is None or abs(variacao) < 1:
+        return "neutra"
+    return "boa notícia" if (variacao > 0) == bom else "má notícia"
+
+
+def _grupos(fatores: list[Fator], dinheiro: bool) -> list[dict]:
+    return [
+        {
+            "grupo": f.grupo[:80],
+            "tipo": f.rotulo_dimensao[:60].lower(),
+            "mudanca": quantia(abs(f.diferenca), dinheiro),
+            "variacao": percentual(f.variacao, com_sinal=False),
+        }
+        for f in fatores[:3]
+    ]
+
+
+@router.post("/{conexao_id}/mudancas/resumo", response_model=Resumo)
+async def resumir_mudancas(
+    organizacao_id: UUID,
+    conexao_id: UUID,
+    dados: PedidoResumo,
+    user: CurrentUser,
+    sessao: Sessao,
+    indicador: UUID,
+):
+    await papel(sessao, organizacao_id, user.id)
+    conexao = await buscar(sessao, organizacao_id, conexao_id)
+    alvo = await sessao.scalar(
+        select(IndicadorDb).where(
+            IndicadorDb.id == indicador, IndicadorDb.conexao_id == conexao_id
+        )
+    )
+    if alvo is None:
+        raise HTTPException(404, "indicador não encontrado")
+    if not disponivel():
+        return Resumo(texto=None)
+    ramo = await sessao.scalar(
+        select(SegmentoDb.nome).where(SegmentoDb.chave == conexao.segmento)
+    )
+    bom = subir_e_bom(alvo.nome, alvo.coluna)
+    pedido = {
+        "negocio": (conexao.descricao_negocio or "não informado")[:300],
+        "ramo": ramo or "não informado",
+        "indicador": alvo.nome,
+        "conta": CONTAS.get(alvo.agregacao, alvo.agregacao),
+        "periodo": PERIODOS.get(dados.janela, dados.janela),
+        "situacao": _situacao(dados.variacao),
+        "avaliacao": _avaliacao(dados.variacao, bom),
+        "agora": quantia(dados.valor, dados.dinheiro),
+        "antes": quantia(dados.anterior, dados.dinheiro),
+        "variacao": percentual(dados.variacao, com_sinal=False),
+        "subiram": _grupos(dados.subiram, dados.dinheiro),
+        "cairam": _grupos(dados.cairam, dados.dinheiro),
+    }
+    await reservar(sessao, user)
+    return Resumo(texto=await resumir(pedido))

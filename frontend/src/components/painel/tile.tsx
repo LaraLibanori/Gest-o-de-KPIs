@@ -7,12 +7,12 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { FRASES, type IndicadorCalculado } from "@/lib/api";
-import { cheio, curto, ehDinheiro } from "@/lib/numero";
+import { cheio, curto, ehDinheiro, subirEBom } from "@/lib/numero";
 import { humano, variacao } from "@/lib/rotulo";
 import Sparkline from "@/components/painel/sparkline";
 import { cn } from "@/lib/utils";
 
-function Delta({ valor }: { valor: number | null }) {
+function Delta({ valor, bom = true }: { valor: number | null; bom?: boolean }) {
   if (valor === null || !Number.isFinite(valor)) {
     return (
       <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
@@ -34,7 +34,7 @@ function Delta({ valor }: { valor: number | null }) {
     <span
       className={cn(
         "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums",
-        subiu ? "text-emerald-500" : "text-rose-500",
+        subiu === bom ? "text-emerald-500" : "text-rose-500",
       )}
     >
       {subiu ? (
@@ -45,6 +45,12 @@ function Delta({ valor }: { valor: number | null }) {
       {variacao(valor)}
     </span>
   );
+}
+
+export function colunas(quantos: number): string {
+  if (quantos === 5) return "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+  if (quantos % 3 === 0) return "sm:grid-cols-2 lg:grid-cols-3";
+  return "sm:grid-cols-2 xl:grid-cols-4";
 }
 
 export default function Tile({
@@ -103,7 +109,7 @@ export default function Tile({
             {indicador.valor === null ? "—" : curto(indicador.valor, moeda)}
           </p>
           <div className="flex items-center gap-2">
-            <Delta valor={indicador.variacao} />
+            <Delta valor={indicador.variacao} bom={subirEBom(indicador)} />
             {janela && (
               <span className="text-muted-foreground truncate text-xs">
                 vs {janela} anteriores

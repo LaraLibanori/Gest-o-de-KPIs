@@ -162,6 +162,29 @@ async def _serie(conexao, de: str, onde: str, coluna: str, balde: str, conta: st
     ]
 
 
+async def _serie_com_anterior(
+    conexao, de: str, coluna: str, inicio: str, inicio_anterior: str, balde: str, conta
+):
+    tempo = citar(coluna)
+    passo = f"(({inicio}) - ({inicio_anterior})) * interval '1 day'"
+    alinhado = f"case when {tempo} >= {inicio} then {tempo} else {tempo} + {passo} end"
+    linhas = await conexao.fetch(
+        f"select date_trunc('{balde}', {alinhado})::date::text as rotulo,"
+        f" {conta} filter (where {tempo} >= {inicio}) as valor,"
+        f" {conta} filter (where {tempo} < {inicio}) as anterior"
+        f" from {de} where {tempo} >= {inicio_anterior}"
+        f" group by 1 order by 1 limit {LIMITE_SERIE}"
+    )
+    return [
+        {
+            "rotulo": r["rotulo"],
+            "valor": _numero(r["valor"]),
+            "anterior": _numero(r["anterior"]),
+        }
+        for r in linhas
+    ]
+
+
 async def calcular(
     conexao: asyncpg.Connection,
     tabela: str,
@@ -223,14 +246,25 @@ async def calcular(
             dados["serie"] = []
             continue
         try:
-            dados["serie"] = await _serie(
-                conexao,
-                de,
-                _onde(indicador.tempo, inicio),
-                indicador.tempo,
-                balde,
-                _conta(indicador),
-            )
+            if inicio_anterior:
+                dados["serie"] = await _serie_com_anterior(
+                    conexao,
+                    de,
+                    indicador.tempo,
+                    inicio,
+                    inicio_anterior,
+                    balde,
+                    _conta(indicador),
+                )
+            else:
+                dados["serie"] = await _serie(
+                    conexao,
+                    de,
+                    _onde(indicador.tempo, inicio),
+                    indicador.tempo,
+                    balde,
+                    _conta(indicador),
+                )
         except Exception:  # noqa: BLE001 - sem serie o numero ainda serve
             registro.exception("falha na serie de %s", indicador.nome)
             dados["serie"] = []
@@ -249,14 +283,22 @@ async def compor(
     if indicador.agregacao != "contagem" and not indicador.coluna:
         raise Impossivel(SEM_CAMPO)
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
-    inicio, _, _ = janela_de(janela)
-    onde = _onde(indicador.tempo, inicio)
+    inicio, inicio_anterior, _ = janela_de(janela)
     aditivo = indicador.agregacao in ("soma", "contagem")
-    total = f", sum({_conta(indicador)}) over () as total" if aditivo else ""
+    conta = _conta(indicador)
+    comparar = bool(indicador.tempo and inicio_anterior)
+    if comparar:
+        tempo = citar(indicador.tempo)
+        valor = f"{conta} filter (where {tempo} >= {inicio})"
+        anterior = f", {conta} filter (where {tempo} < {inicio}) as anterior"
+        onde = f" where {tempo} >= {inicio_anterior}"
+    else:
+        valor, anterior, onde = conta, "", _onde(indicador.tempo, inicio)
+    total = f", sum({valor}) over () as total" if aditivo else ""
     try:
         linhas = await conexao.fetch(
-            f"select {citar(dimensao)}::text as rotulo, {_conta(indicador)} as valor"
-            f"{total} from {_fonte(tabela, calculados)}{onde} group by 1"
+            f"select {citar(dimensao)}::text as rotulo, {valor} as valor"
+            f"{anterior}{total} from {_fonte(tabela, calculados)}{onde} group by 1"
             f" order by 2 desc nulls last limit {int(limite)}",
         )
     except asyncpg.UndefinedColumnError:
@@ -264,7 +306,57 @@ async def compor(
     except asyncpg.QueryCanceledError:
         raise Impossivel(SEM_TEMPO) from None
     pontos = [
-        {"rotulo": r["rotulo"] or "sem valor", "valor": _numero(r["valor"])}
+        {
+            "rotulo": r["rotulo"] or "sem valor",
+            "valor": _numero(r["valor"]),
+            "anterior": _numero(r["anterior"]) if comparar else None,
+        }
         for r in linhas
+        if r["valor"] is not None
     ]
     return pontos, _numero(linhas[0]["total"]) if aditivo and linhas else None
+
+
+async def mudancas(
+    conexao: asyncpg.Connection,
+    tabela: str,
+    indicador,
+    dimensoes: list[str],
+    janela: str | None = None,
+    calculados: list[tuple[str, str]] | None = None,
+) -> list[dict]:
+    inicio, inicio_anterior, _ = janela_de(janela)
+    if not indicador.tempo or not inicio_anterior:
+        raise Impossivel("compare com um período que tenha anterior, como 30 dias")
+    if indicador.agregacao != "contagem" and not indicador.coluna:
+        raise Impossivel(SEM_CAMPO)
+    await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
+    tempo = citar(indicador.tempo)
+    conta = _conta(indicador)
+    de = _fonte(tabela, calculados)
+    fatores = []
+    for dimensao in dimensoes:
+        try:
+            linhas = await conexao.fetch(
+                f"select {citar(dimensao)}::text as grupo,"
+                f" {conta} filter (where {tempo} >= {inicio}) as valor,"
+                f" {conta} filter (where {tempo} < {inicio}) as anterior"
+                f" from {de} where {tempo} >= {inicio_anterior} group by 1"
+            )
+        except asyncpg.QueryCanceledError:
+            raise Impossivel(SEM_TEMPO) from None
+        for r in linhas:
+            agora, antes = _numero(r["valor"]), _numero(r["anterior"])
+            if agora is None and antes is None:
+                continue
+            fatores.append(
+                {
+                    "dimensao": dimensao,
+                    "grupo": r["grupo"] or "sem valor",
+                    "valor": agora,
+                    "anterior": antes,
+                    "diferenca": (agora or 0) - (antes or 0),
+                    "variacao": variacao(agora, antes),
+                }
+            )
+    return fatores

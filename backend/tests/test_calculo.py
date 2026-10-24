@@ -1,17 +1,20 @@
 from dataclasses import dataclass
 
 import asyncpg
+import pytest
 
 from app.calculo import (
     CAIU,
     SEM_CAMPO,
     SEM_COLUNA,
     SEM_NUMERO,
+    Impossivel,
     _conta,
     _onde,
     calcular,
     compor,
     janela_de,
+    mudancas,
     variacao,
 )
 
@@ -118,7 +121,7 @@ class ConexaoContada:
 async def test_agora_e_antes_viem_no_mesmo_select():
     conexao = ConexaoContada()
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
-    valores = [s for s in conexao.selects if "filter" in s]
+    valores = [s for s in conexao.selects if "filter" in s and "date_trunc" not in s]
     assert len(valores) == 1
     assert 'sum("valor_total") filter (where "vendida_em" >=' in valores[0]
     assert "current_date - 59" in valores[0]
@@ -210,9 +213,9 @@ class ComposicaoFalsa:
     async def fetch(self, sql, *args):
         self.sql = sql
         return [
-            {"rotulo": "Site", "valor": 46, "total": 81},
-            {"rotulo": "App", "valor": 32, "total": 81},
-            {"rotulo": None, "valor": 3, "total": 81},
+            {"rotulo": "Site", "valor": 46, "anterior": 40, "total": 81},
+            {"rotulo": "App", "valor": 32, "anterior": 35, "total": 81},
+            {"rotulo": None, "valor": 3, "anterior": None, "total": 81},
         ]
 
 
@@ -259,3 +262,47 @@ async def test_indicador_sem_tempo_ignora_o_periodo():
         s for s in conexao.selects if s.count("sum(") == 1 and "filter" not in s
     )
     assert "where" not in dele
+
+
+async def test_serie_traz_o_periodo_anterior_no_mesmo_select():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
+    assert "as anterior" in conexao.sql
+    assert "interval '1 day'" in conexao.sql
+    assert '"vendida_em" >= current_date - 59' in conexao.sql
+
+
+async def test_janela_tudo_nao_tem_serie_anterior():
+    conexao = ConexaoContada()
+    await calcular(conexao, "exemplo.vendas", [Indicador()], "tudo")
+    assert "anterior" not in conexao.sql
+
+
+class ConexaoComGrupos(ConexaoContada):
+    async def fetch(self, sql):
+        self._ver(sql)
+        return [
+            {"grupo": "Sul", "valor": 10, "anterior": 4},
+            {"grupo": "Norte", "valor": 3, "anterior": 5},
+            {"grupo": None, "valor": None, "anterior": None},
+        ]
+
+
+async def test_mudancas_compara_cada_divisao_com_o_periodo_anterior():
+    conexao = ConexaoComGrupos()
+    fatores = await mudancas(
+        conexao, "exemplo.vendas", Indicador(), ["regiao", "canal"], "30d"
+    )
+    assert len([s for s in conexao.selects if "group by" in s]) == 2
+    sul = next(f for f in fatores if f["grupo"] == "Sul")
+    assert sul["diferenca"] == 6
+    assert sul["variacao"] == 150
+    assert {f["dimensao"] for f in fatores} == {"regiao", "canal"}
+    assert all(f["grupo"] != "sem valor" for f in fatores)
+
+
+async def test_mudancas_pede_janela_com_periodo_anterior():
+    with pytest.raises(Impossivel):
+        await mudancas(
+            ConexaoContada(), "exemplo.vendas", Indicador(), ["regiao"], "tudo"
+        )

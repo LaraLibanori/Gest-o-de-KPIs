@@ -26,6 +26,26 @@ NAO_SOMAVEIS = ("unitario", "unitaria", "medio", "media", "taxa", "percentual")
 
 INTEIROS = ("int", "bigint", "smallint")
 
+RUINS_SE_SOBEM = (
+    "custo",
+    "desconto",
+    "cancel",
+    "devol",
+    "estorno",
+    "atraso",
+    "reclama",
+    "inadimpl",
+    "perda",
+    "churn",
+    "despesa",
+    "abandono",
+)
+
+
+def subir_e_bom(nome: str, coluna: str | None) -> bool:
+    texto = normalizar(f"{nome} {coluna or ''}")
+    return not any(r in texto for r in RUINS_SE_SOBEM)
+
 
 def sugerir_grafico(dimensao: str | None) -> str:
     return "barra" if dimensao else "numero"

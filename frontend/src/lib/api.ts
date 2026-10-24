@@ -257,7 +257,32 @@ export function formasPossiveis(i: {
   );
 }
 
-export type Quebra = { rotulo: string; valor: number | null };
+export type Quebra = {
+  rotulo: string;
+  valor: number | null;
+  anterior?: number | null;
+};
+
+export type Fator = {
+  dimensao: string;
+  rotulo_dimensao: string;
+  grupo: string;
+  valor: number | null;
+  anterior: number | null;
+  diferenca: number;
+  variacao: number | null;
+};
+
+export type Mudancas = {
+  indicador: string;
+  janela: Janela;
+  valor: number | null;
+  anterior: number | null;
+  variacao: number | null;
+  subir_e_bom: boolean;
+  subiram: Fator[];
+  cairam: Fator[];
+};
 
 export type IndicadorCalculado = Indicador & {
   valor: number | null;

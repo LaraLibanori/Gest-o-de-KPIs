@@ -9,7 +9,7 @@ import {
   type Dimensao,
   type IndicadorCalculado,
 } from "@/lib/api";
-import { cheio, curto, ehDinheiro, eixo } from "@/lib/numero";
+import { cheio, curto, ehDinheiro, eixo, subirEBom } from "@/lib/numero";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -133,6 +133,32 @@ function Tabela({
   );
 }
 
+function Delta({
+  agora,
+  antes,
+  bom,
+}: {
+  agora: number;
+  antes: number | null;
+  bom: boolean;
+}) {
+  if (!antes) return <span className="w-14" />;
+  const mudou = ((agora - antes) / Math.abs(antes)) * 100;
+  const sobe = mudou >= 0;
+  return (
+    <span
+      title="em relação ao mesmo período antes"
+      className={cn(
+        "w-14 text-right text-xs font-medium tabular-nums",
+        sobe === bom ? "text-emerald-500" : "text-rose-500",
+      )}
+    >
+      {sobe ? "↑" : "↓"}
+      {Math.abs(mudou).toFixed(0)}%
+    </span>
+  );
+}
+
 export type Forma = "barra" | "pizza" | "tabela";
 
 export default function Composicao({
@@ -191,6 +217,7 @@ export default function Composicao({
 
   const somavel = !NIVEIS.has(indicador.agregacao);
   const moeda = ehDinheiro(indicador);
+  const bom = subirEBom(indicador);
   const pontos = (dados?.pontos ?? []).filter((p) => p.valor !== null);
   const maior = Math.max(...pontos.map((p) => p.valor as number), 0);
   const total = somavel ? (dados?.total ?? 0) : 0;
@@ -266,7 +293,7 @@ export default function Composicao({
                   aria-expanded={escolhido}
                   onClick={() => setAberto(escolhido ? null : p.rotulo)}
                   className={cn(
-                    "grid w-full grid-cols-[minmax(0,7rem)_1fr_auto] items-center gap-3 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/50",
+                    "grid w-full grid-cols-[minmax(0,7rem)_1fr_auto_auto] items-center gap-3 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/50",
                     escolhido && "bg-accent/60",
                   )}
                 >
@@ -275,14 +302,15 @@ export default function Composicao({
                     value={fatia}
                     className="h-2 [&>[data-slot=progress-indicator]]:bg-chart-1 [&>[data-slot=progress-indicator]]:transition-[transform] [&>[data-slot=progress-indicator]]:duration-500"
                   />
-                  <span className="text-muted-foreground w-28 text-right text-xs tabular-nums">
+                  <span className="text-muted-foreground w-16 text-right text-xs tabular-nums sm:w-28">
                     {moeda ? eixo(valor, true) : curto(valor)}
                     {total > 0 && (
-                      <span className="ml-1 opacity-70">
+                      <span className="ml-1 hidden opacity-70 sm:inline">
                         {doTotal.toFixed(0)}%
                       </span>
                     )}
                   </span>
+                  <Delta agora={valor} antes={p.anterior ?? null} bom={bom} />
                 </button>
                 {escolhido && (
                   <dl

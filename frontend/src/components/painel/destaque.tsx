@@ -1,9 +1,10 @@
 "use client";
 
-import type { Dimensao, IndicadorCalculado } from "@/lib/api";
+import type { Dimensao, IndicadorCalculado, Janela } from "@/lib/api";
 import { ehDinheiro } from "@/lib/numero";
 import Composicao from "@/components/painel/composicao";
 import Evolucao from "@/components/painel/evolucao";
+import Mudancas from "@/components/painel/mudancas";
 import {
   Card,
   CardContent,
@@ -91,13 +92,22 @@ export default function Destaque({
     </Card>
   );
 
-  if (forma === "linha") return evolucao;
-  if (forma === "numero")
-    return (
+  const graficos =
+    forma === "linha" ? (
+      evolucao
+    ) : forma === "numero" ? (
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         {evolucao}
         {composicao}
       </div>
+    ) : (
+      <div className="max-w-2xl">{composicao}</div>
     );
-  return <div className="max-w-2xl">{composicao}</div>;
+
+  return (
+    <div className="space-y-4">
+      <Mudancas base={base} indicador={indicador} janela={janela as Janela} />
+      {graficos}
+    </div>
+  );
 }

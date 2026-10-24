@@ -275,6 +275,7 @@ class Proposta(BaseModel):
 class Quebra(BaseModel):
     rotulo: str
     valor: float | None
+    anterior: float | None = None
 
 
 JANELA = Literal["7d", "30d", "90d", "12m", "tudo"]
@@ -298,6 +299,35 @@ class Composicao(BaseModel):
     rotulo: str
     total: float | None = None
     pontos: list[Quebra] = []
+
+
+class Fator(BaseModel):
+    dimensao: str
+    rotulo_dimensao: str
+    grupo: str = Field(max_length=200)
+    valor: float | None
+    anterior: float | None
+    diferenca: float
+    variacao: float | None
+
+
+class Mudancas(BaseModel):
+    indicador: str = Field(max_length=120)
+    janela: JANELA
+    valor: float | None
+    anterior: float | None
+    variacao: float | None
+    subir_e_bom: bool = True
+    subiram: list[Fator] = Field(default=[], max_length=5)
+    cairam: list[Fator] = Field(default=[], max_length=5)
+
+
+class PedidoResumo(Mudancas):
+    dinheiro: bool = False
+
+
+class Resumo(BaseModel):
+    texto: str | None
 
 
 class Painel(BaseModel):
