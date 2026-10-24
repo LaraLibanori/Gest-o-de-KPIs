@@ -86,7 +86,6 @@ async def sugerir_rotulos(
         conexao.descricao_negocio,
     )
 
-    # A llm demora; relê para não sobrescrever o que foi confirmado nesse meio tempo.
     campos = list(
         await sessao.scalars(
             select(CampoDb)

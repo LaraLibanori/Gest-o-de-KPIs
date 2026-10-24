@@ -77,7 +77,6 @@ def upgrade() -> None:
         "ix_organizacao_membros_usuario_id", "organizacao_membros", ["usuario_id"]
     )
 
-    # Quem se cadastra ganha o perfil na hora, sem depender da aplicação.
     op.execute(
         """
         create function public.criar_perfil() returns trigger
@@ -104,7 +103,6 @@ def upgrade() -> None:
         """
     )
 
-    # security definer evita a policy consultar a propria tabela e recursar.
     op.execute(
         """
         create function public.organizacoes_do_usuario() returns setof uuid
@@ -147,5 +145,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Voltar para a 0001 recriaria as tabelas de KPI. Melhor recusar.
     raise NotImplementedError("sem downgrade: recrie o banco a partir da 0001")

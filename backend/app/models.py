@@ -22,7 +22,6 @@ sa.Table(
 USUARIO = "auth.users.id"
 
 
-# Login e senha ficam no auth do Supabase; aqui so o que e da aplicacao.
 class Perfil(Base):
     __tablename__ = "perfis"
     __table_args__ = (
@@ -79,7 +78,6 @@ class Membro(Base):
     )
 
 
-# Ao se cadastrar, um trigger converte o convite em membro e apaga a linha.
 class Convite(Base):
     __tablename__ = "convites"
     __table_args__ = (
@@ -104,7 +102,6 @@ class Convite(Base):
     )
 
 
-# A senha fica cifrada, nunca em texto puro.
 class Conexao(Base):
     __tablename__ = "conexoes"
     __table_args__ = (
@@ -178,7 +175,6 @@ class Campo(Base):
     ordem: Mapped[int] = mapped_column(Integer)
 
 
-# Lista fechada: e ela que faz o cache acertar, porque texto livre nunca repete.
 class Segmento(Base):
     __tablename__ = "segmentos"
 
@@ -209,7 +205,6 @@ class SegmentoKpi(Base):
     ordem: Mapped[int] = mapped_column(Integer)
 
 
-# Md5 do texto normalizado aponta para o segmento.
 class Classificacao(Base):
     __tablename__ = "classificacoes"
 
@@ -223,7 +218,6 @@ class Classificacao(Base):
     )
 
 
-# Guarda o nome da coluna, nao o id: o catalogo e refeito a cada leitura.
 class Indicador(Base):
     __tablename__ = "indicadores"
     __table_args__ = (
@@ -268,7 +262,6 @@ class Indicador(Base):
     )
 
 
-# Dashboard junta indicadores de varias conexoes da mesma organizacao.
 class Dashboard(Base):
     __tablename__ = "dashboards"
     __table_args__ = (

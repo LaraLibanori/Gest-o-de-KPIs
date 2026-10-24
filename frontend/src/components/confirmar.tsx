@@ -17,6 +17,7 @@ export default function Confirmar({
   descricao,
   acao = "Apagar",
   fecharAoConfirmar = true,
+  outra,
   onConfirmar,
   onFechar,
 }: {
@@ -25,6 +26,7 @@ export default function Confirmar({
   descricao: string;
   acao?: string;
   fecharAoConfirmar?: boolean;
+  outra?: { rotulo: string; onClick: () => void };
   onConfirmar: () => void;
   onFechar: () => void;
 }) {
@@ -37,6 +39,11 @@ export default function Confirmar({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Voltar</AlertDialogCancel>
+          {outra && (
+            <AlertDialogCancel onClick={outra.onClick}>
+              {outra.rotulo}
+            </AlertDialogCancel>
+          )}
           <AlertDialogAction
             onClick={(e) => {
               onConfirmar();

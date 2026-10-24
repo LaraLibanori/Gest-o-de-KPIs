@@ -38,6 +38,25 @@ import PassoNegocio from "@/components/assistente/negocio";
 import PassoTabela from "@/components/assistente/tabela";
 import Trilha from "@/components/assistente/trilha";
 
+const RASCUNHO = "rascunho-conexao";
+
+function lerRascunho(): typeof VAZIO {
+  try {
+    const salvo = sessionStorage.getItem(RASCUNHO);
+    return salvo ? { ...VAZIO, ...JSON.parse(salvo), senha: "" } : VAZIO;
+  } catch {
+    return VAZIO;
+  }
+}
+
+function guardarRascunho(form: typeof VAZIO | null) {
+  try {
+    if (form)
+      sessionStorage.setItem(RASCUNHO, JSON.stringify({ ...form, senha: "" }));
+    else sessionStorage.removeItem(RASCUNHO);
+  } catch {}
+}
+
 type Etapa = "credenciais" | "tabela" | "negocio" | "catalogo" | "indicadores";
 
 const ETAPAS: {
@@ -50,7 +69,7 @@ const ETAPAS: {
     id: "credenciais",
     curto: "Acesso",
     titulo: "Conectar ao banco",
-    descricao: "A senha é guardada cifrada e nunca volta para a tela.",
+    descricao: "Os dados de acesso ao banco PostgreSQL da empresa.",
   },
   {
     id: "tabela",
@@ -68,13 +87,15 @@ const ETAPAS: {
     id: "catalogo",
     curto: "Campos",
     titulo: "O que cada coluna é",
-    descricao: "Confira o que a plataforma entendeu. Dá para corrigir.",
+    descricao:
+      "A plataforma já preencheu tudo. Se estiver certo, é só confirmar.",
   },
   {
     id: "indicadores",
     curto: "Indicadores",
     titulo: "O que será calculado",
-    descricao: "Confirme de qual campo cada indicador sai.",
+    descricao:
+      "Estes são os indicadores sugeridos. Se estiver bom, é só concluir.",
   },
 ];
 
@@ -129,6 +150,10 @@ export default function Assistente({
 
   const base = `/organizacoes/${organizacaoId}/conexoes`;
 
+  useEffect(() => {
+    if (aberto && !conexao && !atual) guardarRascunho(form);
+  }, [aberto, conexao, atual, form]);
+
   const buscarRelacoes = useCallback(
     async (id: string, alvo?: string | null) => {
       const busca = alvo ? `?esquema=${encodeURIComponent(alvo)}` : "";
@@ -177,7 +202,7 @@ export default function Assistente({
     if (!conexao) {
       setEtapa("credenciais");
       setAtual(null);
-      setForm(VAZIO);
+      setForm(() => lerRascunho());
       setRelacoes([]);
       setEsquemas([]);
       setEsquema(null);
@@ -286,6 +311,7 @@ export default function Assistente({
       await buscarRelacoes(nova.id, nova.esquema);
       setCriada(!edicao);
       setAtual(nova);
+      guardarRascunho(null);
       setForm(credenciaisDe(nova));
       setMudou(true);
       if (edicao)
@@ -347,7 +373,6 @@ export default function Assistente({
             }),
           );
       } catch {
-        // sem sugestao o catalogo por regra continua valendo
       } finally {
         setSugerindo(false);
       }
@@ -422,7 +447,6 @@ export default function Assistente({
     }
   }
 
-  // Sugestao de forma: se a llm nao responder, a escolhida por regra continua.
   const sugerirGraficos = useCallback(
     async (id: string) => {
       try {
@@ -434,16 +458,13 @@ export default function Assistente({
           },
         );
         if (r.aplicadas === 0) return;
-        // So a forma volta da sugestao: o resto pode ter mudado nesse meio tempo.
         const formas = new Map(r.indicadores.map((i) => [i.id, i.grafico]));
         setIndicadores((lista) =>
           lista.map((i) =>
             formas.has(i.id) ? { ...i, grafico: formas.get(i.id)! } : i,
           ),
         );
-      } catch {
-        // sem sugestao a forma por regra continua valendo
-      }
+      } catch {}
     },
     [base],
   );
@@ -699,10 +720,14 @@ export default function Assistente({
 
       <Confirmar
         aberto={descartando}
-        titulo="Descartar esta conexão?"
-        descricao={`A conexão ${atual?.nome ?? ""} e o que foi configurado até agora serão apagados. O banco da empresa não é alterado.`}
+        titulo="Sair da configuração?"
+        descricao={`A conexão ${atual?.nome ?? ""} fica salva e dá para continuar de onde parou. Descartar apaga o que foi configurado; o banco da empresa não é alterado.`}
         acao="Descartar"
         fecharAoConfirmar={false}
+        outra={{
+          rotulo: "Continuar depois",
+          onClick: () => onFechar(true),
+        }}
         onConfirmar={sairDescartando}
         onFechar={() => setDescartando(false)}
       />

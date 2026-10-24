@@ -23,7 +23,7 @@ SORTEIO = "openrouter/openrouter/free"
 
 PORTE_DESCONHECIDO = 32.0
 JANELA_MINIMA = 8192
-TEMPO_LIMITE = 20
+TEMPO_LIMITE = 25
 DESCANSO = 300
 TENTATIVAS = 3
 
@@ -98,7 +98,6 @@ class ColunaSugerida(BaseModel):
     )
 
 
-# Lista fechada no schema: quem respeita structured output nao inventa coluna.
 def _esquema(colunas: list[str]) -> type[BaseModel]:
     class Coluna(ColunaSugerida):
         coluna: Literal[tuple(colunas)] = Field(  # type: ignore[valid-type]
@@ -167,7 +166,6 @@ def _gratuito(m: dict) -> bool:
     return all(float(preco.get(c, 0) or 0) == 0 for c in ("prompt", "completion"))
 
 
-# Campo ausente nao reprova: nem todo provedor descreve os modelos igual.
 def _serve(m: dict, so_gratuito: bool) -> bool:
     nome = m.get("id", "")
     if nome in TRAVA or any(p in nome.lower() for p in NAO_CHAT):
@@ -201,7 +199,6 @@ async def modelos() -> list[str]:
     async with _tranca:
         if _modelos is not None and time.monotonic() - _modelos_em < TTL_MODELOS:
             return _modelos
-        # O litellm so conhece NVIDIA_NIM_API_KEY: espelha a nossa.
         if os.environ.get("NVIDIA_API_KEY"):
             os.environ.setdefault("NVIDIA_NIM_API_KEY", os.environ["NVIDIA_API_KEY"])
         encontrados: list[tuple[int, float, str]] = []
@@ -226,7 +223,6 @@ async def modelos() -> list[str]:
         return _modelos
 
 
-# O Router deixa de molho quem falhou; lista nova recria o roteador.
 async def _montar(disponiveis: list[str]):
     global _roteador
     if _roteador is not None and {m["model_name"] for m in _roteador.model_list} == set(
@@ -246,7 +242,6 @@ async def _montar(disponiveis: list[str]):
     return _roteador
 
 
-# Um de cada provedor por rodada: a reserva aparece ja na primeira falha.
 def _intercalar(nomes: list[str]) -> list[str]:
     grupos: dict[str, list[str]] = {}
     for nome in nomes:
@@ -268,7 +263,6 @@ async def _perguntar(
 
     import litellm
 
-    # Cada tentativa que falha despeja o traceback inteiro no log.
     litellm.suppress_debug_info = True
     logging.getLogger("LiteLLM").setLevel(logging.CRITICAL)
 
@@ -282,11 +276,14 @@ async def _perguntar(
         modelo = fila.pop(0)
         tentativas += 1
         try:
-            resposta = await roteador.acompletion(
-                model=modelo,
-                messages=mensagens,
-                timeout=TEMPO_LIMITE,
-                response_format=esquema,
+            resposta = await asyncio.wait_for(
+                roteador.acompletion(
+                    model=modelo,
+                    messages=mensagens,
+                    timeout=TEMPO_LIMITE,
+                    response_format=esquema,
+                ),
+                TEMPO_LIMITE,
             )
             dados = esquema.model_validate_json(resposta.choices[0].message.content)
         except ValidationError:
@@ -302,7 +299,6 @@ async def _perguntar(
                 getattr(e, "status_code", None) == 404
                 or "Not found for account" in str(e)
             ) and sem_entidade < TETO_404:
-                # Sem direito ao modelo: tenta o proximo do mesmo provedor.
                 sem_entidade += 1
                 tentativas -= 1
                 proximo = next((m for m in fila if m.startswith(f"{provedor}/")), None)
@@ -323,7 +319,6 @@ async def _perguntar(
     return melhor or None
 
 
-# Manda so nome, tipo e cardinalidade: nenhuma linha da tabela sai do banco.
 async def sugerir(
     campos: list[dict], tabela: str, negocio: str | None
 ) -> dict[str, ColunaSugerida]:
@@ -358,7 +353,6 @@ async def sugerir(
     return {s.coluna: s for s in sugeridas if s.coluna in conhecidas}
 
 
-# A forma volta presa a lista fechada; o que nao servir cai fora depois.
 async def sugerir_graficos(indicadores: list[dict]) -> dict[str, str]:
     if not disponivel() or not indicadores:
         return {}

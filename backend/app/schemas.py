@@ -18,7 +18,6 @@ class Perfil(BaseModel):
 class OrganizacaoIn(BaseModel):
     nome: str = Nome
 
-    # min_length sozinho deixa passar "   ".
     @field_validator("nome")
     @classmethod
     def sem_espaco_sobrando(cls, v: str) -> str:
@@ -106,7 +105,6 @@ class ConexaoProva(BaseModel):
         return v or None
 
 
-# A senha nunca sai daqui.
 class Conexao(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -185,7 +183,6 @@ class Campo(BaseModel):
     formula: str | None = None
     confirmado: bool
     ordem: int
-    # Quantos indicadores apontam para esta coluna: apagar pode quebrar o painel.
     em_uso: int = 0
 
 
@@ -308,7 +305,6 @@ class Painel(BaseModel):
     janela: JANELA
     indicadores: list[IndicadorCalculado] = []
     dimensoes: list[Dimensao] = []
-    # Falso sem coluna de data: o filtro de periodo nao teria efeito.
     janelavel: bool = True
     erro: str | None = None
     avisos: list[str] = []
@@ -330,7 +326,6 @@ class DashboardPatch(BaseModel):
 
 
 class ItemDashboard(IndicadorCalculado):
-    # Sem isso a tela nao sabe de qual conexao o indicador veio.
     conexao_id: UUID
     conexao: str
 

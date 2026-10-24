@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const LARGURAS = {
@@ -56,8 +57,9 @@ export function Cabecalho({
         {voltar && (
           <Link
             href={voltar.href}
-            className="text-muted-foreground hover:text-foreground -ml-2 mb-1 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm transition-colors"
+            className="text-muted-foreground hover:text-foreground -ml-2 mb-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors"
           >
+            <ChevronLeft className="size-4" />
             {voltar.rotulo}
           </Link>
         )}
@@ -68,7 +70,9 @@ export function Cabecalho({
           <p className="text-muted-foreground mt-1 text-sm">{descricao}</p>
         )}
       </div>
-      {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
+      {acoes && (
+        <div className="flex flex-wrap items-center gap-2">{acoes}</div>
+      )}
       {children}
     </div>
   );

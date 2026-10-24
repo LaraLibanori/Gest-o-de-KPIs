@@ -258,7 +258,6 @@ def upgrade() -> None:
         ],
     )
 
-    # Os tres primeiros sao dados de referencia: todo mundo le, ninguem apaga.
     for tabela in ("segmentos", "segmento_kpis", "classificacoes"):
         op.execute(f"alter table {tabela} enable row level security")
         op.execute(f'create policy "leitura comum" on {tabela} for all using (true)')
@@ -268,7 +267,6 @@ def upgrade() -> None:
 
     op.execute(f"grant select, insert, update, delete on indicadores to {ROLE}")
     op.execute("alter table indicadores enable row level security")
-    # A policy de conexoes ja filtra o subselect por organizacao.
     op.execute(
         """
         create policy "indicadores da minha conexao" on indicadores

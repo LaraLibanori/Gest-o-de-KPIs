@@ -45,8 +45,8 @@ from .comum import PREFIXO, buscar, campos, consultar
 router = APIRouter(prefix=PREFIXO, tags=["indicadores"])
 
 
-# Nem chave nem data: quebrar por id so rende top-10, e a data e o eixo.
 def _dimensoes(catalogo: list[CampoDb], tempos: set) -> list[Dimensao]:
+    catalogo = sorted(catalogo, key=lambda c: not 3 <= (c.cardinalidade or 0) <= 12)
     return [
         Dimensao(coluna=c.coluna, rotulo=c.rotulo or c.coluna)
         for c in catalogo
@@ -91,7 +91,6 @@ async def listar_indicadores(
     return list(linhas)
 
 
-# Usa os indicadores do segmento e completa com regra ate fechar a conta.
 @router.post("/{conexao_id}/indicadores/propor", response_model=Proposta)
 async def propor(
     organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
@@ -209,7 +208,8 @@ async def criar_indicador(
         origem="manual",
         confirmado=True,
         ordem=(ultima or 0) + 1,
-        **body.model_dump(),
+        **body.model_dump(exclude={"grafico"}),
+        grafico=body.grafico or sugerir_grafico(body.dimensao),
     )
     sessao.add(novo)
     await sessao.flush()
@@ -241,7 +241,6 @@ async def ajustar_indicador(
     mudancas = body.model_dump(exclude_unset=True)
     for nome, valor in mudancas.items():
         setattr(indicador, nome, valor)
-    # So mexe na forma se a escolhida deixou de caber; nao apaga o que a pessoa pediu.
     if "grafico" not in mudancas and indicador.grafico not in formas_possiveis(
         indicador
     ):
@@ -266,7 +265,6 @@ async def remover_indicador(
 ):
     await exigir_dono(sessao, organizacao_id, user.id, "apagar indicador")
     await buscar(sessao, organizacao_id, conexao_id)
-    # Apagar o indicador leva junto o vinculo do dashboard: avisar antes.
     dashboards = list(
         await sessao.scalars(
             select(DashboardDb.nome)
@@ -434,7 +432,6 @@ async def remover_campo(
     await sessao.commit()
 
 
-# So troca a forma de quem a llm acertou: o que ela sugerir fora do possivel cai.
 @router.post("/{conexao_id}/indicadores/graficos", response_model=SugestaoGrafico)
 async def sugerir_formas(
     organizacao_id: UUID, conexao_id: UUID, user: CurrentUser, sessao: Sessao
@@ -465,7 +462,6 @@ async def sugerir_formas(
         ]
     )
 
-    # A llm demora; relê para não escrever por cima de quem editou nesse meio tempo.
     linhas = list(
         await sessao.scalars(
             select(IndicadorDb)
@@ -494,7 +490,6 @@ async def sugerir_formas(
     return resposta
 
 
-# Abre o banco do cliente uma vez e calcula todos os indicadores nele.
 @router.get("/{conexao_id}/painel", response_model=Painel)
 async def painel(
     organizacao_id: UUID,
@@ -518,7 +513,6 @@ async def painel(
     dimensoes = _dimensoes(catalogo, {i.tempo for i in linhas})
     tempo = next((i.tempo for i in linhas if i.tempo), None)
 
-    # Campo calculado que nao fecha aponta para coluna que foi embora na tabela.
     _, quebrados = derivar(catalogo)
     avisos = [
         f"o campo calculado {nome} ficou de fora: a fórmula aponta para uma "
@@ -573,7 +567,6 @@ async def painel(
     )
 
 
-# A composicao e a pergunta "onde isso esta indo": um indicador, uma dimensao.
 @router.get("/{conexao_id}/composicao", response_model=Composicao)
 async def composicao(
     organizacao_id: UUID,

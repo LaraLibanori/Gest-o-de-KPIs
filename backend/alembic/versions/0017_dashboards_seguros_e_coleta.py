@@ -54,7 +54,6 @@ def upgrade() -> None:
     op.add_column("catalogo_campos", sa.Column("papel_regra", sa.Text()))
     op.add_column("catalogo_campos", sa.Column("papel_modelo", sa.Text()))
 
-    # O front so usa o Supabase para o login; as tabelas so a API deve alcancar.
     lista = ", ".join(TABELAS)
     op.execute(
         f"""

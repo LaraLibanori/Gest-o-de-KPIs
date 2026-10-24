@@ -61,7 +61,6 @@ async def _montar_todos(
     saida: dict[UUID, ItemDashboard] = {}
     nomes: dict[UUID, str] = {}
 
-    # Cada conexao e aberta uma vez so, mesmo que varios dashboards a usem.
     for conexao_id, grupo in por_conexao.items():
         conexao = await sessao.scalar(
             select(ConexaoDb).where(
@@ -236,7 +235,7 @@ async def remover(
     await sessao.commit()
 
 
-@router.put("/{dashboard_id}/indicadores", response_model=Dashboard)
+@router.put("/{dashboard_id}/indicadores", status_code=204)
 async def trocar_indicadores(
     organizacao_id: UUID,
     dashboard_id: UUID,
@@ -245,7 +244,7 @@ async def trocar_indicadores(
     sessao: Sessao,
 ):
     await papel(sessao, organizacao_id, user.id)
-    linha = await _linha(sessao, organizacao_id, dashboard_id)
+    await _linha(sessao, organizacao_id, dashboard_id)
     ids = list(dict.fromkeys(dados.indicadores))
 
     donos = set(
@@ -273,5 +272,3 @@ async def trocar_indicadores(
         for ordem, i in enumerate(ids)
     )
     await sessao.commit()
-    await entrar(sessao, user)
-    return await _montar(sessao, organizacao_id, linha, JANELA_PADRAO)

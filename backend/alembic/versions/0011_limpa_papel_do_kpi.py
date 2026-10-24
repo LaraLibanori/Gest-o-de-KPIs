@@ -10,7 +10,6 @@ branch_labels = None
 depends_on = None
 
 
-# Quem decide o papel aceito e a agregacao, nao o kpi.
 def upgrade() -> None:
     op.drop_column("segmento_kpis", "papel")
 

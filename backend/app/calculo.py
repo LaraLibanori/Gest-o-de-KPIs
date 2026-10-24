@@ -70,7 +70,6 @@ def _numero(valor) -> float | None:
 
 
 def variacao(agora: float | None, antes: float | None) -> float | None:
-    # Base zero nao tem variacao: dividir por zero e dizer "infinito" e mentira.
     if agora is None or not antes:
         return None
     return (agora - antes) / abs(antes) * 100
@@ -80,7 +79,6 @@ def _caiu(erro: Exception) -> bool:
     return isinstance(erro, asyncpg.PostgresConnectionError | asyncpg.InterfaceError)
 
 
-# Um nivel de subquery por campo, porque alias nao vale no mesmo select.
 def _fonte(tabela: str, calculados: list[tuple[str, str]] | None) -> str:
     if not calculados:
         return qualificar(*partir(tabela))
@@ -107,7 +105,6 @@ def _falha(erro: Exception) -> dict:
     return {"erro": "não foi possível calcular"}
 
 
-# Sem where externo: o filtro de agregacao roda sobre o que sobrou do where.
 async def _valores(
     conexao, de: str, atual: str, antes: str, grupo: list, onde_atual: str = ""
 ) -> dict:
@@ -130,7 +127,6 @@ async def _valores(
         saida: dict[str, dict] = {}
         for indicador in grupo:
             try:
-                # Onde_atual ja vem com o " where"; repetir viraria syntax error.
                 bruto = await conexao.fetchval(
                     f"select {_conta(indicador)} from {de}{onde_atual}"
                 )
@@ -255,7 +251,6 @@ async def compor(
     await conexao.execute(f"set statement_timeout = {TEMPO_CONSULTA}")
     inicio, _, _ = janela_de(janela)
     onde = _onde(indicador.tempo, inicio)
-    # Soma de grupos so tem sentido para soma e contagem; a janela vale antes do limit.
     aditivo = indicador.agregacao in ("soma", "contagem")
     total = f", sum({_conta(indicador)}) over () as total" if aditivo else ""
     try:

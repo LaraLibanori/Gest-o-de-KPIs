@@ -87,6 +87,11 @@ export default function PassoNegocio({
           {rotuloCancelar}
         </Button>
         <div className="flex-1" />
+        {ocupado && (
+          <span className="text-muted-foreground text-xs">
+            Lendo as colunas, leva alguns segundos…
+          </span>
+        )}
         <Button type="submit" disabled={ocupado}>
           {ocupado && <Loader2 className="animate-spin" />}
           Ler os campos

@@ -13,7 +13,6 @@ REFERENCIA = ("segmentos", "segmento_kpis", "classificacoes")
 
 
 def upgrade() -> None:
-    # for all deixava a policy permitir escrita; so os grants seguravam.
     for tabela in REFERENCIA:
         op.execute(f'drop policy "leitura comum" on {tabela}')
         op.execute(f'create policy "leitura comum" on {tabela} for select using (true)')
@@ -22,7 +21,6 @@ def upgrade() -> None:
         'create policy "grava classificacao" on classificacoes'
         " for insert with check (true)"
     )
-    # A pessoa pode trocar o segmento que foi sugerido, e a troca corrige o cache.
     op.execute(
         'create policy "corrige classificacao" on classificacoes'
         " for update using (true) with check (true)"

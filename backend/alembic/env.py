@@ -18,7 +18,6 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
-# O schema auth e do Supabase: as migrations nao mexem nele.
 def incluir(objeto, nome, tipo, reflexo, comparado):
     if tipo == "table":
         return objeto.schema in (None, "public")

@@ -12,8 +12,8 @@ const BACKEND = (
   (DOMINIO ? `https://${DOMINIO}/api` : "http://127.0.0.1:8000")
 ).replace(/\/$/, "");
 
-// Maior que o teto de 20s por chamada da LLM, senao o proxy aborta antes.
-const PRAZO = 65_000;
+// Maior que o teto de 25s por chamada da LLM, senao o proxy aborta antes.
+const PRAZO = 85_000;
 const ESCRITA = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function erro(status: number, detail: string) {

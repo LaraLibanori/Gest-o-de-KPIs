@@ -1,6 +1,7 @@
 "use client";
 
 import type { Dimensao, IndicadorCalculado } from "@/lib/api";
+import { ehDinheiro } from "@/lib/numero";
 import Composicao from "@/components/painel/composicao";
 import Evolucao from "@/components/painel/evolucao";
 import {
@@ -13,6 +14,14 @@ import {
 
 const SEM_ZERO = new Set(["media", "minimo", "maximo"]);
 const SOMAVEIS = new Set(["soma", "contagem", "distintos"]);
+export const APARAR = new Set(["90d", "12m", "tudo"]);
+const BALDES: Record<string, string> = {
+  "7d": "por dia, últimos 7 dias",
+  "30d": "por dia, últimos 30 dias",
+  "90d": "por semana, últimos 90 dias",
+  "12m": "por mês, últimos 12 meses",
+  tudo: "por mês, todo o período",
+};
 
 export default function Destaque({
   indicador,
@@ -25,25 +34,28 @@ export default function Destaque({
 }: {
   indicador: IndicadorCalculado;
   base: string;
-  dimensoes: Dimensao[];
+  dimensoes: Dimensao[] | null;
   janela: string;
   rotuloDe: (coluna: string | null) => string;
   carregandoSerie?: boolean;
   origem?: string;
 }) {
   const forma = indicador.grafico;
-  const variacao =
-    indicador.variacao === null
-      ? "sem período anterior"
-      : `variação de ${indicador.variacao.toFixed(1).replace(".", ",")}%`;
+  const moeda = ehDinheiro(indicador);
 
   const evolucao = (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">{indicador.nome}</CardTitle>
-        <CardDescription>
-          {[origem, variacao].filter(Boolean).join(" · ")}
-        </CardDescription>
+        <CardTitle className="text-sm">
+          {indicador.nome}
+          {origem && (
+            <span className="text-muted-foreground font-normal">
+              {" "}
+              · {origem}
+            </span>
+          )}
+        </CardTitle>
+        <CardDescription>{BALDES[janela] ?? ""}</CardDescription>
       </CardHeader>
       <CardContent>
         <Evolucao
@@ -52,11 +64,9 @@ export default function Destaque({
           total={SOMAVEIS.has(indicador.agregacao) ? indicador.valor : null}
           zero={!SEM_ZERO.has(indicador.agregacao)}
           carregando={carregandoSerie}
+          moeda={moeda}
+          aparar={APARAR.has(janela)}
         />
-        <p className="text-muted-foreground mt-2 text-xs">
-          Passe o mouse ou use as setas do teclado para ver o valor de cada
-          período.
-        </p>
       </CardContent>
     </Card>
   );
@@ -64,10 +74,8 @@ export default function Destaque({
   const composicao = (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Composição</CardTitle>
-        <CardDescription>
-          Como {indicador.nome.toLowerCase()} se reparte
-        </CardDescription>
+        <CardTitle className="text-sm">Divisão de {indicador.nome}</CardTitle>
+        <CardDescription>Clique numa linha para ver o detalhe.</CardDescription>
       </CardHeader>
       <CardContent>
         <Composicao

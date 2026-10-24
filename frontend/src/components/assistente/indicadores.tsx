@@ -48,7 +48,7 @@ function Campos({
   const opcoes = campos.filter((c) => papeis.includes(c.papel));
   return (
     <Select
-      value={valor ?? NENHUM}
+      value={valor ?? (opcional ? NENHUM : "")}
       onValueChange={(v) => onMudar(v === NENHUM ? null : v)}
     >
       <SelectTrigger
@@ -89,12 +89,15 @@ function Frase({
 
   const papeis = PAPEIS_ACEITOS[agregacao];
   const rotulo = campos.find((c) => c.coluna === coluna)?.rotulo ?? coluna;
-  const sugerido =
+  const quebra = campos.find((c) => c.coluna === dimensao);
+  const base =
     agregacao === "contagem"
       ? "Total de registros"
       : rotulo
         ? `${AGREGACOES[agregacao]} de ${rotulo}`
         : "";
+  const sugerido =
+    base && quebra ? `${base} por ${quebra.rotulo ?? quebra.coluna}` : base;
   const falta = papeis.length > 0 && !coluna;
 
   async function salvar() {
@@ -235,7 +238,7 @@ export default function PassoIndicadores({
         {ocupado
           ? "Montando os indicadores…"
           : indicadores.length === 0
-            ? "Nada por aqui ainda."
+            ? null
             : faltando > 0
               ? `${indicadores.length} ${indicadores.length === 1 ? "indicador" : "indicadores"} · ${faltando} esperando você escolher o campo`
               : `${indicadores.length} ${indicadores.length === 1 ? "indicador definido" : "indicadores, todos com campo definido"}`}
@@ -246,7 +249,8 @@ export default function PassoIndicadores({
           [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)
         ) : indicadores.length === 0 ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            Nenhum indicador ainda. Adicione o primeiro abaixo.
+            Nenhum indicador ainda. Escolha o ramo na etapa Contexto para
+            receber sugestões, ou adicione um abaixo.
           </p>
         ) : (
           indicadores.map((i) => {
@@ -263,7 +267,7 @@ export default function PassoIndicadores({
                     </p>
                   </div>
                   {i.origem === "segmento" && (
-                    <Badge variant="secondary">ramo</Badge>
+                    <Badge variant="secondary">sugestão do ramo</Badge>
                   )}
                   <Button
                     size="icon"
@@ -289,7 +293,12 @@ export default function PassoIndicadores({
                     value={i.grafico}
                     onValueChange={(v) => onTrocarGrafico(i, v as Grafico)}
                   >
-                    <SelectTrigger size="sm" className="w-auto min-w-28">
+                    <SelectTrigger
+                      size="sm"
+                      className="w-auto min-w-28"
+                      aria-label="Como mostrar"
+                      title="Como mostrar no painel"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

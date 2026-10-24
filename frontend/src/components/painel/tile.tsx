@@ -7,7 +7,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { FRASES, type IndicadorCalculado } from "@/lib/api";
-import { cheio, curto } from "@/lib/numero";
+import { cheio, curto, ehDinheiro } from "@/lib/numero";
 import { humano, variacao } from "@/lib/rotulo";
 import Sparkline from "@/components/painel/sparkline";
 import { cn } from "@/lib/utils";
@@ -51,15 +51,22 @@ export default function Tile({
   indicador,
   janela,
   selecionado,
+  origem,
+  aparar = false,
   onSelecionar,
 }: {
   indicador: IndicadorCalculado;
   janela: string;
   selecionado: boolean;
+  origem?: string;
+  aparar?: boolean;
   onSelecionar: () => void;
 }) {
   const rotulo = humano(indicador.coluna ?? "");
-  const conta = FRASES[indicador.agregacao](rotulo);
+  const quebra = indicador.dimensao ? ` por ${humano(indicador.dimensao)}` : "";
+  const conta = FRASES[indicador.agregacao](rotulo) + quebra;
+  const rodape = origem ? `${origem} · ${conta}` : conta;
+  const moeda = ehDinheiro(indicador);
 
   return (
     <button
@@ -88,16 +95,18 @@ export default function Tile({
           <p
             className="text-3xl leading-none font-semibold tabular-nums"
             title={
-              indicador.valor === null ? undefined : cheio(indicador.valor)
+              indicador.valor === null
+                ? undefined
+                : cheio(indicador.valor, moeda)
             }
           >
-            {indicador.valor === null ? "—" : curto(indicador.valor)}
+            {indicador.valor === null ? "—" : curto(indicador.valor, moeda)}
           </p>
           <div className="flex items-center gap-2">
             <Delta valor={indicador.variacao} />
             {janela && (
               <span className="text-muted-foreground truncate text-xs">
-                vs {janela}
+                vs {janela} anteriores
               </span>
             )}
           </div>
@@ -107,15 +116,16 @@ export default function Tile({
       {!indicador.erro && indicador.serie.length > 1 && (
         <Sparkline
           pontos={indicador.serie}
+          aparar={aparar}
           className="-mx-1 h-9 w-[calc(100%+0.5rem)]"
         />
       )}
 
       <p
         className="text-muted-foreground truncate text-xs"
-        title={`${conta} · ${indicador.nome}`}
+        title={`${rodape} · ${indicador.nome}`}
       >
-        {conta}
+        {rodape}
       </p>
     </button>
   );

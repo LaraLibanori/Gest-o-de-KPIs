@@ -54,7 +54,6 @@ def upgrade() -> None:
         """
     )
 
-    # Quem se cadastra depois do convite ja entra na organizacao.
     op.execute(
         """
         create function public.aceitar_convites() returns trigger

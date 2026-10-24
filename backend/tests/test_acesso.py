@@ -29,7 +29,6 @@ async def test_quem_nao_participa_nao_enxerga(cliente, admin):
 
     async with cliente(bob) as c:
         assert (await c.get("/organizacoes")).json() == []
-        # 404 e nao 403: nao pode nem confirmar que a organizacao existe.
         assert (await c.get(f"/organizacoes/{org}/membros")).status_code == 404
         assert (await c.get(f"/organizacoes/{org}/conexoes")).status_code == 404
 

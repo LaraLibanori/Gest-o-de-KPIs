@@ -235,7 +235,7 @@ export default function Conexoes() {
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className="flex flex-wrap items-center gap-2">
+              <CardContent className="flex flex-1 flex-wrap content-start items-center gap-2">
                 <Situacao conexao={c} />
                 {c.tabela_fato ? (
                   <Badge variant="outline" className="font-mono">

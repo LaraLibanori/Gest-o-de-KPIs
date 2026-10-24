@@ -77,13 +77,13 @@ _FRASES: tuple[tuple[str, str], ...] = (
     ("password authentication failed", "senha incorreta para o usuário informado"),
     (
         "no pg_hba.conf entry",
-        "o servidor não aceita conexão deste host para este usuário",
+        "o servidor não libera acesso deste local para esse usuário",
     ),
     ('role "', "o usuário informado não existe nesse banco"),
     ('database "', "o banco informado não existe nesse servidor"),
     ("ssl", "o servidor exige SSL e a conexão não negociou"),
     ("timeout", "o banco não respondeu a tempo"),
-    ("refused", "o host recusou a conexão, confira host e porta"),
+    ("refused", "o servidor recusou a conexão, confira o endereço e a porta"),
 )
 
 
@@ -95,15 +95,19 @@ def _postgres(e: asyncpg.PostgresError) -> str:
     for marca, texto in _FRASES:
         if marca in baixo:
             return f"Não foi possível conectar: {texto}. Confira os dados."
-    return "Não foi possível conectar ao banco. Confira host, porta e credenciais."
+    return (
+        "Não foi possível conectar ao banco. Confira endereço, porta, usuário e senha."
+    )
 
 
 def _rede(e: OSError) -> str:
     if isinstance(e, socket.gaierror):
-        return "Não foi possível resolver o host. Confira o endereço ou a DNS."
+        return (
+            "Não encontramos esse endereço de servidor. Confira se está escrito certo."
+        )
     if isinstance(e, ConnectionRefusedError):
-        return "O host recusou a conexão. Confira o host e a porta."
-    return "Não foi possível alcançar o host informado. Confira o endereço e a porta."
+        return "O servidor recusou a conexão. Confira o endereço e a porta."
+    return "Não foi possível alcançar o servidor. Confira o endereço e a porta."
 
 
 async def buscar(sessao, organizacao_id: UUID, conexao_id: UUID) -> ConexaoDb:

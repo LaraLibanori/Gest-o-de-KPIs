@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LayoutDashboard, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, type Dashboard, type Janela } from "@/lib/api";
@@ -44,6 +45,7 @@ import { useOrganizacao } from "../contexto";
 
 export default function Dashboards() {
   const { aberta } = useOrganizacao();
+  const router = useRouter();
   const [lista, setLista] = useState<Dashboard[]>([]);
   const [janela, setJanela] = useState<Janela>("30d");
   const [carregando, setCarregando] = useState(true);
@@ -87,15 +89,12 @@ export default function Dashboards() {
     setErroForm(null);
     setSalvando(true);
     try {
-      await api<Dashboard>(base, {
+      const novo = await api<Dashboard>(base, {
         method: "POST",
         body: JSON.stringify({ nome, descricao: descricao || null }),
       });
-      setNome("");
-      setDescricao("");
-      setAberto(false);
-      await carregar();
-      toast.success("dashboard criado");
+      toast.success("Dashboard criado. Agora escolha os indicadores.");
+      router.push(`/dashboards/${novo.id}`);
     } catch (e) {
       setErroForm(e instanceof Error ? e.message : "não foi possível criar");
     } finally {

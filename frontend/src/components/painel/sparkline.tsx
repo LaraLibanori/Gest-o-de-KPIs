@@ -7,17 +7,17 @@ import { ChartContainer } from "@/components/ui/chart";
 export default function Sparkline({
   pontos,
   className = "h-10 w-full",
+  aparar = false,
 }: {
   pontos: Quebra[];
   className?: string;
+  aparar?: boolean;
 }) {
-  const validos = pontos.filter((p) => p.valor !== null);
+  const todos = pontos.filter((p) => p.valor !== null);
+  const validos = aparar && todos.length > 4 ? todos.slice(1, -1) : todos;
   if (validos.length < 2) return <div className={className} aria-hidden />;
 
-  const subiu =
-    (validos[validos.length - 1].valor as number) >=
-    (validos[0].valor as number);
-  const cor = subiu ? "var(--chart-1)" : "var(--chart-4)";
+  const cor = "var(--chart-1)";
 
   return (
     <ChartContainer

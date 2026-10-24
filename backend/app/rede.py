@@ -9,7 +9,6 @@ class RedeInterna(Exception):
     pass
 
 
-# Conectar no ip conferido, e nao no nome, fecha a janela para o dns mudar.
 async def conferir(host: str) -> str:
     if PERMITIR_REDE_INTERNA:
         return host
@@ -18,14 +17,17 @@ async def conferir(host: str) -> str:
             host, None, type=socket.SOCK_STREAM
         )
     except OSError as e:
-        raise RedeInterna("não foi possível resolver o host") from e
+        raise RedeInterna(
+            "Não encontramos esse endereço de servidor. Confira se está escrito certo."
+        ) from e
 
     for info in enderecos:
         ip = ipaddress.ip_address(info[4][0])
         embutido = getattr(ip, "ipv4_mapped", None) or getattr(ip, "sixtofour", None)
         if not ip.is_global or (embutido and not embutido.is_global):
-            raise RedeInterna("endereço de rede interna não é aceito")
+            raise RedeInterna(
+                "Endereços de rede interna, como localhost, não são aceitos."
+            )
 
-    # IPv4 na frente: as funções da Vercel não saem por IPv6.
     quatro = [i for i in enderecos if i[0] == socket.AF_INET]
     return (quatro or enderecos)[0][4][0]

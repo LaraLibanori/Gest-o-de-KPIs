@@ -1,7 +1,6 @@
 const JANELA = 10 * 60_000;
 const registro = new Map<string, { n: number; ate: number }>();
 
-// Em memoria: vale por instancia, o que ja barra o script de senhas mais comum.
 export function excedeu(chave: string, limite: number): boolean {
   const agora = Date.now();
   if (registro.size > 1000)

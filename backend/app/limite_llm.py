@@ -19,7 +19,6 @@ async def reservar(sessao: Sessao, user: CurrentUser) -> None:
     resultado = await sessao.scalar(
         text("select public.reservar_llm(:u, :t)"), {"u": POR_USUARIO, "t": TOTAL}
     )
-    # Grava a reserva antes da chamada lenta, senao uma falha a devolveria de graca.
     await sessao.commit()
     await entrar(sessao, user)
     if resultado != "ok":

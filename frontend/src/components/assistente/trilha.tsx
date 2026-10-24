@@ -20,7 +20,7 @@ export default function Trilha({
     <nav aria-label="Etapas" className="w-full">
       <ol className="flex items-start gap-1">
         {itens.map((item, i) => {
-          const feito = visited.includes(i) && i !== indice;
+          const feito = i < indice || (visited.includes(i) && i !== indice);
           const atual = i === indice;
           const podeIr = i <= indice || visited.includes(i);
           const Icone = feito ? Check : null;

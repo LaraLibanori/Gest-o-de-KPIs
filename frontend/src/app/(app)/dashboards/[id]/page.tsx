@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
-import Destaque from "@/components/painel/destaque";
+import Destaque, { APARAR } from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
 import Tile from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
@@ -40,7 +40,10 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { useOrganizacao } from "../../contexto";
+
+const poucos = (n: number | null) => n !== null && n >= 3 && n <= 12;
 
 export default function DetalheDoDashboard() {
   const { id } = useParams<{ id: string }>();
@@ -85,13 +88,26 @@ export default function DetalheDoDashboard() {
     () => indicadores.filter((i) => i.erro === null && i.valor !== null),
     [indicadores],
   );
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, ItemDashboard[]>();
+    for (const i of indicadores)
+      mapa.set(i.conexao, [...(mapa.get(i.conexao) ?? []), i]);
+    return [...mapa.entries()];
+  }, [indicadores]);
+
   const destaque: ItemDashboard | null = useMemo(() => {
     const achado = bons.find((i) => i.id === selecionado);
     return achado ?? bons[0] ?? null;
   }, [bons, selecionado]);
 
-  const [catalogo, setCatalogo] = useState<Campo[]>([]);
+  const [lido, setLido] = useState<{ de: string; campos: Campo[] } | null>(
+    null,
+  );
   const conexaoDoDestaque = destaque?.conexao_id ?? null;
+  const catalogo = useMemo(
+    () => (lido && lido.de === conexaoDoDestaque ? lido.campos : []),
+    [lido, conexaoDoDestaque],
+  );
 
   useEffect(() => {
     if (!aberta || !conexaoDoDestaque) return;
@@ -99,8 +115,8 @@ export default function DetalheDoDashboard() {
     api<Campo[]>(
       `/organizacoes/${aberta.id}/conexoes/${conexaoDoDestaque}/catalogo`,
     )
-      .then((r) => vivo && setCatalogo(r))
-      .catch(() => vivo && setCatalogo([]));
+      .then((r) => vivo && setLido({ de: conexaoDoDestaque, campos: r }))
+      .catch(() => vivo && setLido({ de: conexaoDoDestaque, campos: [] }));
     return () => {
       vivo = false;
     };
@@ -121,6 +137,10 @@ export default function DetalheDoDashboard() {
             !/^id$|^id_|_id$/i.test(c.coluna) &&
             !tempos.has(c.coluna),
         )
+        .sort(
+          (a, b) =>
+            Number(!poucos(a.cardinalidade)) - Number(!poucos(b.cardinalidade)),
+        )
         .map((c) => ({ coluna: c.coluna, rotulo: c.rotulo ?? c.coluna })),
     [catalogo, tempos],
   );
@@ -136,7 +156,7 @@ export default function DetalheDoDashboard() {
     if (!base || salvando) return;
     setSalvando(true);
     try {
-      await api<Dashboard>(`${base}/indicadores`, {
+      await api<void>(`${base}/indicadores`, {
         method: "PUT",
         body: JSON.stringify({ indicadores: escolhidos }),
       });
@@ -237,23 +257,38 @@ export default function DetalheDoDashboard() {
         </Empty>
       ) : (
         <>
-          <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {indicadores.map((i) => (
-              <Tile
-                key={i.id}
-                indicador={i}
-                janela={rotuloJanela}
-                selecionado={destaque?.id === i.id}
-                onSelecionar={() => setSelecionado(i.id)}
-              />
-            ))}
-          </div>
+          {grupos.map(([conexao, itens]) => (
+            <section key={conexao} className="space-y-3">
+              {grupos.length > 1 && (
+                <h2 className="text-muted-foreground text-sm font-medium">
+                  {conexao}
+                </h2>
+              )}
+              <div
+                className={cn(
+                  "grid items-stretch gap-4 sm:grid-cols-2",
+                  itens.length % 3 === 0 ? "lg:grid-cols-3" : "xl:grid-cols-4",
+                )}
+              >
+                {itens.map((i) => (
+                  <Tile
+                    key={i.id}
+                    indicador={i}
+                    janela={rotuloJanela}
+                    selecionado={destaque?.id === i.id}
+                    aparar={APARAR.has(janela)}
+                    onSelecionar={() => setSelecionado(i.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
 
           {destaque && (
             <Destaque
               indicador={destaque}
               base={`/organizacoes/${aberta?.id ?? ""}/conexoes/${destaque.conexao_id}`}
-              dimensoes={dimensoes}
+              dimensoes={lido?.de === conexaoDoDestaque ? dimensoes : null}
               janela={janela}
               rotuloDe={rotulo}
               origem={destaque.conexao}
@@ -403,8 +438,11 @@ function EscolherIndicadores({
           <Button variant="outline" onClick={() => onAbrir(false)}>
             Cancelar
           </Button>
-          <Button disabled={salvando} onClick={() => onSalvar(marcados)}>
-            Salvar
+          <Button
+            disabled={salvando || carregando}
+            onClick={() => onSalvar(marcados)}
+          >
+            {salvando ? "Salvando…" : "Salvar"}
           </Button>
         </div>
       </DialogContent>

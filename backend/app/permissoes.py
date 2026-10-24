@@ -14,7 +14,6 @@ async def papel(sessao: AsyncSession, organizacao_id: UUID, usuario_id: UUID) ->
             Membro.usuario_id == usuario_id,
         )
     )
-    # 404 e nao 403: quem nao participa nem fica sabendo que a organizacao existe.
     if resultado is None:
         raise HTTPException(404, "organização não encontrada")
     return resultado

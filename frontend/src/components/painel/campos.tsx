@@ -102,7 +102,6 @@ export default function CamposCalculados({
       aoMudar();
       toast.success("campo apagado");
     } catch (e) {
-      // 409 significa que indicador depende do campo: perguntar antes de quebrar.
       if (e instanceof Conflito) {
         setConfirmando(campo);
         return;

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// O navegador não renova a sessão (o cookie é httpOnly), então isso fica aqui.
 export async function proxy(request: NextRequest) {
   let resposta = NextResponse.next({ request });
 

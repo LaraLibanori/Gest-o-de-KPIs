@@ -32,7 +32,6 @@ async def listar(user: CurrentUser, sessao: Sessao):
 
 @router.post("", response_model=Organizacao, status_code=201)
 async def criar(body: OrganizacaoIn, user: CurrentUser, sessao: Sessao):
-    # Pela RLS quem cria ainda nao e membro, entao nao inseriria a si mesmo.
     linha = (
         await sessao.execute(
             text("select id, nome, criada_em from public.criar_organizacao(:nome)"),
@@ -131,7 +130,6 @@ async def convidar(
         await sessao.commit()
         return resposta
 
-    # Sem conta ainda: fica pendente e o trigger converte quando ela se cadastrar.
     pendente = await sessao.scalar(
         select(ConviteDb).where(
             ConviteDb.organizacao_id == organizacao_id, ConviteDb.email == email
@@ -182,7 +180,6 @@ async def remover_membro(
     if meu_papel != "dono" and usuario_id != user.id:
         raise HTTPException(403, "só o dono pode remover outra pessoa")
 
-    # for_update trava as linhas: dois pedidos ao mesmo tempo nao zeram os donos.
     donos = (
         await sessao.scalars(
             select(MembroDb.usuario_id)

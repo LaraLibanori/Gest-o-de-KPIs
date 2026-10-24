@@ -20,7 +20,6 @@ def upgrade() -> None:
     if "'" in senha:
         raise RuntimeError("a senha do kpi_app não pode ter aspas simples")
 
-    # A API deixa de conectar como postgres, que ignora RLS.
     op.execute(
         f"""
         do $$
@@ -34,7 +33,6 @@ def upgrade() -> None:
     )
     op.execute(f"alter role {ROLE} with password '{senha}'")
 
-    # O postgres do Supabase nao declara nosuperuser, entao confere em vez de presumir.
     op.execute(
         f"""
         do $$
@@ -53,10 +51,8 @@ def upgrade() -> None:
     op.execute(f"grant usage on schema public to {ROLE}")
     op.execute(f"grant select on perfis to {ROLE}")
     op.execute(f"grant select, insert, delete on organizacoes to {ROLE}")
-    # update por causa do select ... for update que trava o ultimo dono.
     op.execute(f"grant select, insert, update, delete on organizacao_membros to {ROLE}")
 
-    # O schema auth nao e liberavel pelo postgres, entao as policies leem o usuario daqui.
     op.execute(
         """
         create function public.usuario_atual() returns uuid
@@ -77,7 +73,6 @@ def upgrade() -> None:
         """
     )
 
-    # A policy de perfis esconde quem ainda nao divide organizacao: so esta funcao acha.
     op.execute(
         """
         create function public.usuario_por_email(p_email text) returns uuid
@@ -115,7 +110,6 @@ def upgrade() -> None:
         """
     )
 
-    # O returning do insert passa pela policy de select, e o criador ainda nao e membro.
     op.execute(
         """
         create function public.criar_organizacao(p_nome text) returns organizacoes
@@ -144,7 +138,6 @@ def downgrade() -> None:
     op.execute("drop function if exists public.usuario_por_email(text)")
     op.execute("drop function if exists public.criar_organizacao(text)")
 
-    # Devolve as policies da 0002, que voltam a usar auth.uid().
     op.execute(
         'drop policy if exists "perfil proprio ou de quem divide organizacao" on perfis'
     )
@@ -185,4 +178,3 @@ def downgrade() -> None:
     for tabela in TABELAS:
         op.execute(f"revoke all on {tabela} from {ROLE}")
     op.execute(f"revoke usage on schema public from {ROLE}")
-    # O role fica sem privilegio: dropar e recriar derruba a conexao no pooler.

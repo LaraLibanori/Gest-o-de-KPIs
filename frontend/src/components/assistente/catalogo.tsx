@@ -189,10 +189,7 @@ export default function PassoCatalogo({
           {rotuloCancelar}
         </Button>
         <div className="flex-1" />
-        <Button
-          onClick={onAvancar}
-          disabled={ocupado || sugerindo || campos.length === 0}
-        >
+        <Button onClick={onAvancar} disabled={ocupado || campos.length === 0}>
           Confirmar e montar indicadores
         </Button>
       </div>

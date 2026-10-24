@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import { Cell, Pie, PieChart } from "recharts";
 import {
   api,
@@ -10,7 +9,7 @@ import {
   type Dimensao,
   type IndicadorCalculado,
 } from "@/lib/api";
-import { cheio, curto } from "@/lib/numero";
+import { cheio, curto, ehDinheiro, eixo } from "@/lib/numero";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -41,10 +40,12 @@ function Pizza({
   pontos,
   total,
   nome,
+  moeda,
 }: {
   pontos: Quebra[];
   total: number;
   nome: string;
+  moeda: boolean;
 }) {
   const fatias = pontos.filter((p) => (p.valor ?? 0) > 0);
   const cor = (i: number) => `var(--chart-${(i % 5) + 1})`;
@@ -81,7 +82,7 @@ function Pizza({
             />
             <span className="truncate">{p.rotulo}</span>
             <span className="text-muted-foreground ml-auto tabular-nums">
-              {curto(p.valor as number)}
+              {moeda ? eixo(p.valor as number, true) : curto(p.valor as number)}
               {total > 0 &&
                 ` · ${(((p.valor as number) / total) * 100).toFixed(0)}%`}
             </span>
@@ -92,7 +93,15 @@ function Pizza({
   );
 }
 
-function Tabela({ pontos, total }: { pontos: Quebra[]; total: number }) {
+function Tabela({
+  pontos,
+  total,
+  moeda,
+}: {
+  pontos: Quebra[];
+  total: number;
+  moeda: boolean;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -107,7 +116,7 @@ function Tabela({ pontos, total }: { pontos: Quebra[]; total: number }) {
           <TableRow key={p.rotulo}>
             <TableCell className="max-w-40 truncate">{p.rotulo}</TableCell>
             <TableCell className="text-right tabular-nums">
-              {cheio(p.valor as number)}
+              {cheio(p.valor as number, moeda)}
             </TableCell>
             {total > 0 && (
               <TableCell className="text-muted-foreground text-right tabular-nums">
@@ -129,19 +138,20 @@ export type Forma = "barra" | "pizza" | "tabela";
 export default function Composicao({
   base,
   indicador,
-  dimensoes,
+  dimensoes: lista,
   janela,
   rotuloDe,
   forma = "barra",
 }: {
   base: string;
   indicador: IndicadorCalculado;
-  dimensoes: Dimensao[];
+  dimensoes: Dimensao[] | null;
   janela: string;
   rotuloDe: (coluna: string | null) => string;
   forma?: Forma;
 }) {
   const [escolhida, setColuna] = useState<string>("");
+  const dimensoes = lista ?? [];
   const preferida =
     dimensoes.find((d) => d.coluna === indicador.dimensao) ?? dimensoes[0];
   const coluna = dimensoes.some((d) => d.coluna === escolhida)
@@ -180,9 +190,19 @@ export default function Composicao({
   }, [base, coluna, indicador.id, janela]);
 
   const somavel = !NIVEIS.has(indicador.agregacao);
+  const moeda = ehDinheiro(indicador);
   const pontos = (dados?.pontos ?? []).filter((p) => p.valor !== null);
   const maior = Math.max(...pontos.map((p) => p.valor as number), 0);
   const total = somavel ? (dados?.total ?? 0) : 0;
+
+  if (lista === null)
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-7 w-full" />
+        ))}
+      </div>
+    );
 
   if (dimensoes.length === 0)
     return (
@@ -194,6 +214,9 @@ export default function Composicao({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
+        <span className="text-muted-foreground shrink-0 text-sm">
+          Dividir por
+        </span>
         <Select value={coluna} onValueChange={setColuna}>
           <SelectTrigger size="sm" className="flex-1">
             <SelectValue placeholder="escolha a divisão" />
@@ -206,7 +229,6 @@ export default function Composicao({
             ))}
           </SelectContent>
         </Select>
-        <ChevronDown className="text-muted-foreground size-4 shrink-0" />
       </div>
 
       {erro && <p className="text-muted-foreground text-sm">{erro}</p>}
@@ -222,9 +244,14 @@ export default function Composicao({
           Sem dados neste período
         </p>
       ) : forma === "pizza" ? (
-        <Pizza pontos={pontos} total={total} nome={indicador.nome} />
+        <Pizza
+          pontos={pontos}
+          total={total}
+          nome={indicador.nome}
+          moeda={moeda}
+        />
       ) : forma === "tabela" ? (
-        <Tabela pontos={pontos} total={total} />
+        <Tabela pontos={pontos} total={total} moeda={moeda} />
       ) : (
         <ul className="space-y-1.5">
           {pontos.map((p) => {
@@ -248,8 +275,8 @@ export default function Composicao({
                     value={fatia}
                     className="h-2 [&>[data-slot=progress-indicator]]:bg-chart-1 [&>[data-slot=progress-indicator]]:transition-[transform] [&>[data-slot=progress-indicator]]:duration-500"
                   />
-                  <span className="text-muted-foreground w-20 text-right text-xs tabular-nums">
-                    {curto(valor)}
+                  <span className="text-muted-foreground w-28 text-right text-xs tabular-nums">
+                    {moeda ? eixo(valor, true) : curto(valor)}
                     {total > 0 && (
                       <span className="ml-1 opacity-70">
                         {doTotal.toFixed(0)}%
@@ -267,7 +294,7 @@ export default function Composicao({
                     <div>
                       <dt>Valor</dt>
                       <dd className="text-foreground tabular-nums">
-                        {cheio(valor)}
+                        {cheio(valor, moeda)}
                       </dd>
                     </div>
                     {total > 0 && (
@@ -294,8 +321,10 @@ export default function Composicao({
 
       {dados && pontos.length > 0 && somavel && (
         <p className="text-muted-foreground text-xs">
-          Top {pontos.length}
-          {total > 0 && <> · {cheio(total)} no período</>}
+          {pontos.length >= 10
+            ? `Top ${pontos.length}`
+            : `${pontos.length} grupos`}
+          {total > 0 && <> · {cheio(total, moeda)} no período</>}
         </p>
       )}
     </div>

@@ -14,7 +14,6 @@ from .config import DATABASE_URL, USAR_POOL, url_asyncpg
 _fabrica: async_sessionmaker[AsyncSession] | None = None
 
 
-# Guardar conexao so vale em processo longo, com um event loop so.
 def _pool() -> dict:
     if USAR_POOL:
         return {"pool_size": 5, "max_overflow": 0, "pool_recycle": 280}
@@ -24,7 +23,6 @@ def _pool() -> dict:
 def _sessoes() -> async_sessionmaker[AsyncSession]:
     global _fabrica
     if _fabrica is None:
-        # Nome unico por statement, senao dois clientes colidem no pooler.
         motor = create_async_engine(
             url_asyncpg(DATABASE_URL),
             **_pool(),
@@ -39,7 +37,6 @@ def _sessoes() -> async_sessionmaker[AsyncSession]:
     return _fabrica
 
 
-# O true prende o valor a transacao: depois de um commit e preciso chamar de novo.
 async def entrar(sessao: AsyncSession, user: CurrentUser) -> None:
     await sessao.execute(
         text("select set_config('request.jwt.claims', :claims, true)"),

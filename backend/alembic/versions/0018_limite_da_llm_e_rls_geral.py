@@ -25,7 +25,6 @@ def upgrade() -> None:
     op.execute("create index uso_llm_criado_em on uso_llm (criado_em)")
     op.execute("alter table uso_llm enable row level security")
 
-    # So esta funcao enxerga o uso de todos; a tabela fica fechada para o role.
     op.execute(
         """
         create function public.reservar_llm(p_por_usuario int, p_total int)
@@ -51,7 +50,6 @@ def upgrade() -> None:
     )
     op.execute("revoke execute on function public.reservar_llm(int, int) from public")
     op.execute(f"grant execute on function public.reservar_llm(int, int) to {ROLE}")
-    # O Supabase concede execute a esses papeis por padrao, fora do "public".
     op.execute(
         """
         do $$

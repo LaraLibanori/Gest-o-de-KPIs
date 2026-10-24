@@ -41,7 +41,6 @@ app = FastAPI(
 SEGREDO_SERVIDOR = os.environ.get("SEGREDO_SERVIDOR", "")
 
 
-# Só o servidor do Next chama a API: sem o segredo, o /api público nem existe.
 @app.middleware("http")
 async def identificar(request: Request, chamar):
     request.state.pedido = uuid.uuid4().hex[:8]
@@ -87,7 +86,6 @@ def health() -> dict:
     }
 
 
-# health diz que subiu, ready diz que o banco responde.
 @app.get("/ready")
 async def ready(response: Response) -> dict:
     try:

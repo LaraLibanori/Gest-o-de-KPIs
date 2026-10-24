@@ -79,7 +79,6 @@ async def limpar(admin):
 
 
 async def criar_usuario(admin, email: str) -> uuid.UUID:
-    # O trigger da migration cria o perfil e converte os convites pendentes.
     return await admin.fetchval(
         "insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id",
         email.lower(),

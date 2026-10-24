@@ -1,8 +1,8 @@
 const BASE = "/servidor";
 
-// Maior que o teto de 20s por chamada da LLM, senao a pagina aborta antes.
+// Maior que o teto de 25s por chamada da LLM, senao a pagina aborta antes.
 const PRAZO = 15000;
-const PRAZO_LLM = 70000;
+const PRAZO_LLM = 90000;
 
 // Conflito: apagar ou mexer nisso quebraria algo que ja esta em uso.
 export class Conflito extends Error {
@@ -36,13 +36,11 @@ export async function api<T>(
       },
     });
   } catch {
-    // Estouro de tempo ou rede fora: a mensagem crua do navegador não ajuda.
     throw new Error("o servidor não respondeu, tente de novo");
   }
 
   if (res.status === 401) sessaoExpirada();
 
-  // 409 e conflito de estado: a tela precisa perguntar, nao só mostrar erro.
   if (res.status === 409) throw new Conflito(await mensagem(res));
   if (!res.ok) throw new Error(await mensagem(res));
 
@@ -57,7 +55,6 @@ const GENERICO: Record<number, string> = {
 };
 
 async function mensagem(res: Response): Promise<string> {
-  // 422 do FastAPI vem como lista de campo: so o texto simples do backend presta.
   const corpo = await res.json().catch(() => null);
   if (typeof corpo?.detail === "string") return corpo.detail;
   return GENERICO[res.status] ?? "não foi possível completar a ação";

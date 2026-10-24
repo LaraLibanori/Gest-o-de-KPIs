@@ -69,7 +69,6 @@ def test_filtro_cita_a_coluna():
 def test_variacao_usa_base_absoluta():
     assert variacao(120, 100) == 20
     assert variacao(80, 100) == -20
-    # Subir de -100 para 0 e subir 100%, nao descer.
     assert variacao(0, -100) == 100
 
 
@@ -121,7 +120,6 @@ async def test_agora_e_antes_viem_no_mesmo_select():
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     valores = [s for s in conexao.selects if "filter" in s]
     assert len(valores) == 1
-    # Com "filter (" a query nem roda, e o fallback por indicador perde a variacao.
     assert 'sum("valor_total") filter (where "vendida_em" >=' in valores[0]
     assert "current_date - 59" in valores[0]
     assert "current_date - 29" in valores[0]
@@ -136,7 +134,6 @@ async def test_janela_tudo_nao_pede_variacao():
 
 
 async def test_a_janela_anterior_nao_pode_vir_de_where_externo():
-    # Com where externo na janela atual, a anterior vira recorte vazio e a variacao some.
     conexao = ConexaoContada()
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     linha = next(s for s in conexao.selects if "filter" in s)
@@ -174,7 +171,6 @@ async def test_coluna_que_sumiu_nao_leva_o_lote_junto():
     conexao = ConexaoContada(quebrar="sumiu")
     painel = [Indicador(id="a"), Indicador(id="b", coluna="sumiu")]
     resultado = await calcular(conexao, "exemplo.vendas", painel, "30d")
-    # O lote inteiro falhou, entao cada um foi refeito e so o culpado became erro.
     assert resultado["a"]["valor"] is not None
     assert resultado["b"]["erro"] == SEM_COLUNA
 
@@ -243,7 +239,6 @@ async def test_composicao_respeita_a_janela():
 
 
 async def test_resgate_usa_o_where_pronto_e_nao_o_filtro():
-    # Passar o fragmento do filter no resgate daria syntax error.
     conexao = ConexaoContada(quebrar="sum(")
     await calcular(conexao, "exemplo.vendas", [Indicador()], "30d")
     resgatado = next(s for s in conexao.selects if "filter" not in s)
@@ -260,7 +255,6 @@ async def test_indicador_sem_tempo_ignora_o_periodo():
     assert resultado["sem"]["valor"] is not None
     assert resultado["sem"]["anterior"] is None
     assert resultado["sem"]["serie"] == []
-    # O sem tempo conta a tabela toda: o select dele nao tem filtro nenhum.
     dele = next(
         s for s in conexao.selects if s.count("sum(") == 1 and "filter" not in s
     )

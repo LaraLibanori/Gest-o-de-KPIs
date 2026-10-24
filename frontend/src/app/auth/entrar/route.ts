@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
   )
     return NextResponse.json({ mensagem: "dados inválidos" }, { status: 400 });
 
-  // Atras da Vercel todos chegam ao Supabase pelo mesmo IP, entao o limite fica aqui.
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "";
   if (excedeu(`ip:${ip}`, 30) || excedeu(`email:${email.toLowerCase()}`, 8))
     return NextResponse.json(
@@ -32,6 +31,11 @@ export async function POST(request: NextRequest) {
       ? await supabase.auth.signInWithPassword({ email, password: senha })
       : await supabase.auth.signUp({ email, password: senha });
 
+  if (error?.name === "AuthRetryableFetchError")
+    return NextResponse.json(
+      { codigo: "indisponivel", mensagem: "" },
+      { status: 503 },
+    );
   if (error)
     return NextResponse.json(
       { codigo: error.code, mensagem: error.message },

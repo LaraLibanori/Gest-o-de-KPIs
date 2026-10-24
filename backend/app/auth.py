@@ -32,7 +32,6 @@ def _recusar() -> HTTPException:
     return HTTPException(401, "token inválido ou expirado")
 
 
-# Função sync: o FastAPI roda ela em threadpool e não trava o event loop.
 def get_user(
     cred: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> User:

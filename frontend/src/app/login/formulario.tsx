@@ -18,7 +18,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Modo = "entrar" | "criar";
 
-// As mensagens do Supabase vêm em inglês e cruas demais para a tela.
 function traduzir(codigo: string | undefined, mensagem: string): string {
   if (codigo === "user_already_exists")
     return "Já existe uma conta com esse e-mail.";
@@ -27,6 +26,8 @@ function traduzir(codigo: string | undefined, mensagem: string): string {
     return "A senha precisa de pelo menos 6 caracteres.";
   if (codigo === "over_request_rate_limit")
     return "Muitas tentativas seguidas. Espere um pouco.";
+  if (codigo === "indisponivel")
+    return "O serviço de login não respondeu. Tente de novo em instantes.";
   return mensagem || "Não foi possível concluir. Tente de novo.";
 }
 
@@ -65,10 +66,8 @@ export default function Formulario() {
       return;
     }
 
-    // A conta já nasce ativa, então quem se cadastra entra direto.
     if (modo === "criar") sessionStorage.setItem("conta-criada", "1");
     const proxima = new URLSearchParams(window.location.search).get("proxima");
-    // So caminho do proprio site: "//x" e "/\x" levariam para outro dominio.
     router.push(proxima && /^\/(?![/\\])/.test(proxima) ? proxima : "/");
     router.refresh();
   }

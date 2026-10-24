@@ -12,7 +12,6 @@ def upgrade() -> None:
     op.execute("update perfis set email = lower(email) where email <> lower(email)")
     op.execute("create unique index perfis_email_unico on perfis (lower(email))")
 
-    # O convite procura o e-mail em minusculo, entao o trigger tem que gravar assim.
     op.execute(
         """
         create or replace function public.criar_perfil() returns trigger

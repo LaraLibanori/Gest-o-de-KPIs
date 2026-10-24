@@ -27,7 +27,6 @@ NAO_SOMAVEIS = ("unitario", "unitaria", "medio", "media", "taxa", "percentual")
 INTEIROS = ("int", "bigint", "smallint")
 
 
-# Quebra por categoria pede barra; o resto e numero ate o usuario trocar.
 def sugerir_grafico(dimensao: str | None) -> str:
     return "barra" if dimensao else "numero"
 
@@ -48,7 +47,6 @@ def _texto(campo) -> str:
     return normalizar(f"{campo.coluna} {_rotulo(campo)}")
 
 
-# Chave que nomeia alguma coisa serve para contar; a chave da propria linha nao.
 def _entidade(campo) -> bool:
     return campo.coluna != "id" and identificador(campo.coluna)
 
@@ -57,7 +55,6 @@ def _somavel(campo) -> bool:
     return not any(p in _texto(campo) for p in NAO_SOMAVEIS)
 
 
-# Quem se chama total costuma ser o valor cheio, e dinheiro vem antes de contagem.
 def _peso(campo) -> tuple:
     return (
         0 if "total" in _texto(campo) else 1,
@@ -120,7 +117,6 @@ def por_regra(campos, quantos: int = QUANTOS) -> list[dict]:
     return indicadores
 
 
-# Semelhanca fraca ou empatada vira escolha do usuario, nao chute.
 def casar(kpi, campos) -> dict:
     aceitos = PAPEIS_ACEITOS[kpi.agregacao]
     if not aceitos:

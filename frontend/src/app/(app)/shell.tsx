@@ -95,7 +95,6 @@ export default function Shell({
     recarregar();
   }, [recarregar]);
 
-  // O login deixa esse aviso ao criar a conta.
   useEffect(() => {
     if (sessionStorage.getItem("conta-criada") !== "1") return;
     sessionStorage.removeItem("conta-criada");

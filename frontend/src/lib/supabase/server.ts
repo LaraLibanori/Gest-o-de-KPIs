@@ -19,9 +19,7 @@ export async function createClient() {
                 secure: process.env.NODE_ENV === "production",
               }),
             );
-          } catch {
-            // Server Component não escreve cookie; o proxy renova a sessão.
-          }
+          } catch {}
         },
       },
     },

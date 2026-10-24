@@ -84,7 +84,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_vendas_owner_id", "vendas", ["owner_id"])
 
-    # RLS protege o acesso pelo navegador; a API filtra por owner_id.
     for tabela in ("dashboards", "indicadores", "vendas"):
         op.execute(f"alter table {tabela} enable row level security")
 

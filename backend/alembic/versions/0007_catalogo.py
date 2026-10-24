@@ -17,7 +17,6 @@ PAPEIS = "('metrica', 'dimensao', 'tempo', 'ignorar')"
 
 
 def upgrade() -> None:
-    # As conexoes que ja existem foram criadas antes do assistente.
     op.execute(
         f"alter table conexoes add column etapa text not null default 'pronta'"
         f" check (etapa in {ETAPAS})"
@@ -53,7 +52,6 @@ def upgrade() -> None:
 
     op.execute(f"grant select, insert, update, delete on catalogo_campos to {ROLE}")
     op.execute("alter table catalogo_campos enable row level security")
-    # A policy de conexoes ja filtra o subselect por organizacao.
     op.execute(
         """
         create policy "catalogo da minha conexao" on catalogo_campos

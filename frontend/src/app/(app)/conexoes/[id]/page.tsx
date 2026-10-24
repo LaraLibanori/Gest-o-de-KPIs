@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   ChartNoAxesColumn,
+  DatabaseZap,
   Info,
   RefreshCw,
   TriangleAlert,
@@ -17,10 +19,9 @@ import {
   type Janela,
   type Painel,
 } from "@/lib/api";
-import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
 import CamposCalculados from "@/components/painel/campos";
-import Destaque from "@/components/painel/destaque";
+import Destaque, { APARAR } from "@/components/painel/destaque";
 import ControleJanela from "@/components/painel/janela";
 import Tile from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
@@ -59,6 +60,7 @@ export default function PainelDaConexao() {
   const [carregando, setCarregando] = useState(true);
   const [carregandoSerie, setCarregandoSerie] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [naoAchou, setNaoAchou] = useState(false);
   const pedido = useRef(0);
   const pintou = useRef(false);
   const contexto = useRef(false);
@@ -74,11 +76,11 @@ export default function PainelDaConexao() {
     [campos],
   );
 
-  // Trocar de conexao nao remonta a tela, entao o contexto precisa ser zerado.
   useEffect(() => {
     contexto.current = false;
     pintou.current = false;
     setSelecionado(null);
+    setNaoAchou(false);
   }, [id]);
 
   const buscar = useCallback(
@@ -88,7 +90,6 @@ export default function PainelDaConexao() {
       const chave = `${id}:${alvo}`;
       const guardado = paineis.get(chave);
 
-      // Mostra o que tem sem esperar e revalida por tras, sem piscar a tela.
       if (guardado && !forcar) {
         setPainel(guardado.completo ?? guardado.rapido);
         setCarregando(false);
@@ -102,14 +103,19 @@ export default function PainelDaConexao() {
       }
 
       try {
-        // Atualizar recarrega o catalogo: coluna nova no banco precisa aparecer.
         if (!contexto.current || forcar) {
           const [lista, catalogo] = await Promise.all([
             api<Conexao[]>(base),
-            api<Campo[]>(`${base}/${id}/catalogo`),
+            api<Campo[]>(`${base}/${id}/catalogo`).catch((e: unknown) => e),
           ]);
+          const achada = lista.find((c) => c.id === id);
+          if (!achada) {
+            setNaoAchou(true);
+            return;
+          }
+          if (!Array.isArray(catalogo)) throw catalogo;
           contexto.current = true;
-          setConexao(lista.find((c) => c.id === id) ?? null);
+          setConexao(achada);
           setCampos(catalogo);
         }
 
@@ -146,8 +152,11 @@ export default function PainelDaConexao() {
               : "os números estão acima, mas a série falhou",
           );
         } else {
-          setErro(e instanceof Error ? e.message : "não foi possível carregar");
-          falhar(e, "não foi possível carregar o painel");
+          setErro(
+            e instanceof Error
+              ? `Não foi possível carregar o painel: ${e.message}`
+              : "Não foi possível carregar o painel.",
+          );
         }
       } finally {
         if (meu === pedido.current) {
@@ -164,7 +173,6 @@ export default function PainelDaConexao() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- troca de janela chama buscar direto
   }, [carregandoOrg, buscar]);
 
-  // Indicador marcado nao sobrevive a troca de periodo.
   useEffect(() => setSelecionado(null), [janela]);
 
   const todos = useMemo(() => painel?.indicadores ?? [], [painel]);
@@ -173,6 +181,10 @@ export default function PainelDaConexao() {
     [todos],
   );
   const comFalha = useMemo(() => todos.filter((i) => i.erro !== null), [todos]);
+  const vazio =
+    janela !== "tudo" &&
+    todos.length > 0 &&
+    todos.every((i) => i.erro === null && !i.valor);
 
   const destaque: IndicadorCalculado | null = useMemo(() => {
     const achado = indicadores.find((i) => i.id === selecionado);
@@ -188,6 +200,26 @@ export default function PainelDaConexao() {
       tudo: "",
     }[janela] ?? "";
 
+  if (naoAchou)
+    return (
+      <Pagina largura="largo">
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <DatabaseZap />
+            </EmptyMedia>
+            <EmptyTitle>Conexão não encontrada</EmptyTitle>
+            <EmptyDescription>
+              Ela pode ter sido apagada ou pertencer a outra organização.
+            </EmptyDescription>
+          </EmptyHeader>
+          <Button asChild size="sm">
+            <Link href="/">Ver conexões</Link>
+          </Button>
+        </Empty>
+      </Pagina>
+    );
+
   return (
     <Pagina largura="largo">
       <Cabecalho
@@ -198,9 +230,9 @@ export default function PainelDaConexao() {
             {painel?.tabela ? (
               <span className="font-mono">{painel.tabela}</span>
             ) : (
-              "Os indicadores calculados a partir da tabela fato."
+              "Indicadores calculados a partir da tabela fato"
             )}
-            {painel?.tabela && " · "}
+            {" · "}
             {painel?.janela === "tudo"
               ? "todo o período"
               : `últimos ${rotuloJanela}`}
@@ -244,6 +276,26 @@ export default function PainelDaConexao() {
         <Alert variant="destructive">
           <TriangleAlert />
           <AlertDescription>{erro ?? painel?.erro}</AlertDescription>
+        </Alert>
+      )}
+
+      {vazio && !carregando && (
+        <Alert>
+          <Info />
+          <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            Não há registros nos últimos {rotuloJanela}. Os dados podem ser mais
+            antigos.
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setJanela("tudo");
+                buscar("tudo");
+              }}
+            >
+              Ver todo o período
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -298,6 +350,7 @@ export default function PainelDaConexao() {
                 indicador={i}
                 janela={rotuloJanela}
                 selecionado={destaque?.id === i.id}
+                aparar={APARAR.has(janela)}
                 onSelecionar={() => setSelecionado(i.id)}
               />
             ))}
