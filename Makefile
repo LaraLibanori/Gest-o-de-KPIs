@@ -121,7 +121,7 @@ moda:
 	[ -n "$${DEMO_LEITOR_PASSWORD:-}" ] || { echo "falta DEMO_LEITOR_PASSWORD em $(ENV_BACK)"; exit 1; }; \
 	psql "$$MIGRATIONS_DATABASE_URL" -q -v ON_ERROR_STOP=1 \
 	  -v senha="$$DEMO_LEITOR_PASSWORD" -f supabase/moda.sql
-	@echo "base de moda criada em moda.vendas"
+	@echo "base de moda criada em moda_loja_schema.vendas"
 
 taxas:
 	@$(call CARREGAR,$(ENV_BACK)); \

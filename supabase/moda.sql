@@ -63,15 +63,15 @@ with dias as (
   select d::date as dia,
          extract(month from d) as mes,
          extract(dow from d) as semana
-  from generate_series(current_date - 364, current_date, interval '1 day') d
+  from generate_series(current_date - 729, current_date, interval '1 day') d
 ),
 volume as (
   select dia,
          extract(month from dia) as mes,
          extract(dow from dia) as semana,
          greatest(1, round(
-           40
-           * (1 + 0.30 * (dia - (current_date - 364)) / 364.0)
+           90
+           * (1 + 0.30 * (dia - (current_date - 729)) / 729.0)
            * (case extract(month from dia)
                 when 11 then 2.1 when 12 then 2.4 when 5 then 1.5
                 when 1 then 0.65 when 2 then 0.8 else 1.0 end)
@@ -130,7 +130,7 @@ select
   s.qtd,
   round(s.qtd * s.custo, 2),
   500000 + s.pedido,
-  1 + floor(12000 * power(s.r_cli, 1.7))::bigint,
+  1 + floor(25000 * power(s.r_cli, 1.7))::bigint,
   s.dia,
   s.categoria,
   s.marca,

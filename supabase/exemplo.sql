@@ -36,13 +36,13 @@ with dias as (
          (current_date - d::date) as idade,
          extract(month from d) as mes,
          extract(dow from d) as semana
-  from generate_series(current_date - 729, current_date, interval '1 day') d
+  from generate_series(current_date - 1094, current_date, interval '1 day') d
 ),
 volume as (
   select dia,
          greatest(1, round(
-           20
-           * (1 + 0.45 * (730 - idade) / 730.0)
+           60
+           * (1 + 0.45 * (1095 - idade) / 1095.0)
            * (case when mes in (11, 12) then 1.7
                    when mes in (1, 2) then 0.75
                    else 1 end)
@@ -72,7 +72,7 @@ atributos as (
   select
     n,
     dia,
-    1 + floor(12000 * power(r_cli, 1.6))::bigint as cliente_id,
+    1 + floor(30000 * power(r_cli, 1.6))::bigint as cliente_id,
     case when r_cat < 0.30 then 'Eletrônicos'
          when r_cat < 0.55 then 'Móveis'
          when r_cat < 0.85 then 'Acessórios'
