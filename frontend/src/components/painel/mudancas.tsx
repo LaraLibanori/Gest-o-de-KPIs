@@ -126,9 +126,15 @@ export default function Mudancas({
 
   if (!ativo) return null;
 
-  const atual = dados?.chave === chave ? dados : null;
+  const atual =
+    dados?.chave === chave
+      ? dados
+      : guardados.has(chave)
+        ? { chave, valor: guardados.get(chave) ?? null }
+        : null;
   const mudou = atual?.valor ?? null;
-  const resumo = texto?.chave === chave ? texto.valor : null;
+  const resumo =
+    texto?.chave === chave ? texto.valor : (resumos.get(chave) ?? null);
   const moeda = ehDinheiro(indicador);
   const periodo = PERIODOS[janela];
 

@@ -184,6 +184,8 @@ export default function PainelDaConexao() {
     [todos],
   );
   const comFalha = useMemo(() => todos.filter((i) => i.erro !== null), [todos]);
+  const trocando =
+    carregando || (!!painel && painel.janela !== janela && !erro);
   const vazio =
     janela !== "tudo" &&
     todos.length > 0 &&
@@ -334,7 +336,13 @@ export default function PainelDaConexao() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <>
+        <div
+          aria-busy={trocando}
+          className={cn(
+            "flex flex-col gap-6 transition-opacity",
+            trocando && "opacity-50",
+          )}
+        >
           {comFalha.length === indicadores.length &&
             indicadores.length === 0 && (
               <Alert>
@@ -392,7 +400,7 @@ export default function PainelDaConexao() {
               }
             />
           )}
-        </>
+        </div>
       )}
     </Pagina>
   );
