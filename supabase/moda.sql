@@ -63,7 +63,7 @@ with dias as (
   select d::date as dia,
          extract(month from d) as mes,
          extract(dow from d) as semana
-  from generate_series(current_date - 729, current_date, interval '1 day') d
+  from generate_series(date '2025-01-01', date '2026-12-31', interval '1 day') d
 ),
 volume as (
   select dia,
@@ -71,7 +71,7 @@ volume as (
          extract(dow from dia) as semana,
          greatest(1, round(
            90
-           * (1 + 0.30 * (dia - (current_date - 729)) / 729.0)
+           * (1 + 0.30 * (dia - date '2025-01-01') / 729.0)
            * (case extract(month from dia)
                 when 11 then 2.1 when 12 then 2.4 when 5 then 1.5
                 when 1 then 0.65 when 2 then 0.8 else 1.0 end)

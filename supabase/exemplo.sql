@@ -4,7 +4,7 @@ create schema if not exists exemplo;
 
 begin;
 
--- Termina sempre na data de hoje, então os números mudam de um dia para o outro.
+-- De 2024 até 31/12/2026, com semente fixa: rodar de novo gera os mesmos dados.
 select setseed(0.42);
 
 drop table if exists exemplo.vendas;
@@ -33,16 +33,16 @@ insert into exemplo.vendas
    valor_total, vendida_em)
 with dias as (
   select d::date as dia,
-         (current_date - d::date) as idade,
+         (date '2026-12-31' - d::date) as idade,
          extract(month from d) as mes,
          extract(dow from d) as semana
-  from generate_series(current_date - 1094, current_date, interval '1 day') d
+  from generate_series(date '2024-01-01', date '2026-12-31', interval '1 day') d
 ),
 volume as (
   select dia,
          greatest(1, round(
            60
-           * (1 + 0.45 * (1095 - idade) / 1095.0)
+           * (1 + 0.45 * (1096 - idade) / 1096.0)
            * (case when mes in (11, 12) then 1.7
                    when mes in (1, 2) then 0.75
                    else 1 end)

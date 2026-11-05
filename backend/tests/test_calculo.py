@@ -55,7 +55,10 @@ def test_janela_desconhecida_cai_no_padrao():
 
 def test_recorte_exige_coluna_de_tempo():
     assert _onde(None, "current_date - 30") == ""
-    assert _onde("vendida_em", "") == ""
+
+
+def test_janela_tudo_so_conta_ate_hoje():
+    assert _onde("vendida_em", "") == ' where "vendida_em" < current_date + 1'
 
 
 def test_janela_tudo_nao_recorta():
@@ -65,7 +68,7 @@ def test_janela_tudo_nao_recorta():
 
 def test_filtro_cita_a_coluna():
     assert _onde("vendida_em", "current_date - 30") == (
-        ' where "vendida_em" >= current_date - 30'
+        ' where "vendida_em" >= current_date - 30 and "vendida_em" < current_date + 1'
     )
 
 
@@ -131,7 +134,7 @@ async def test_agora_e_antes_viem_no_mesmo_select():
 async def test_janela_tudo_nao_pede_variacao():
     conexao = ConexaoContada()
     resultado = await calcular(conexao, "exemplo.vendas", [Indicador()], "tudo")
-    assert not any("filter" in s for s in conexao.selects)
+    assert not any(" as a0" in s for s in conexao.selects)
     assert resultado["1"]["anterior"] is None
     assert resultado["1"]["variacao"] is None
 
@@ -248,6 +251,7 @@ async def test_resgate_usa_o_where_pronto_e_nao_o_filtro():
     assert resgatado == (
         'select sum("valor_total") from "exemplo"."vendas"'
         ' where "vendida_em" >= current_date - 29'
+        ' and "vendida_em" < current_date + 1'
     )
 
 
@@ -306,3 +310,15 @@ async def test_mudancas_pede_janela_com_periodo_anterior():
         await mudancas(
             ConexaoContada(), "exemplo.vendas", Indicador(), ["regiao"], "tudo"
         )
+
+
+async def test_data_futura_fica_fora_de_toda_janela():
+    for janela in ("7d", "30d", "90d", "12m", "tudo"):
+        conexao, grupos = ConexaoContada(), ConexaoComGrupos()
+        await calcular(conexao, "exemplo.vendas", [Indicador()], janela)
+        await compor(conexao, "exemplo.vendas", Indicador(), "canal", janela)
+        if janela != "tudo":
+            await mudancas(grupos, "exemplo.vendas", Indicador(), ["canal"], janela)
+        selects = conexao.selects + grupos.selects
+        assert selects
+        assert all("< current_date + 1" in s for s in selects), janela

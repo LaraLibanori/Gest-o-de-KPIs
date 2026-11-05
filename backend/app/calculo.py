@@ -29,6 +29,7 @@ JANELAS: dict[str, tuple[str, str, str]] = {
     "tudo": ("", "", "month"),
 }
 JANELA_PADRAO = "30d"
+ATE_HOJE = "current_date + 1"
 LIMITE_SERIE = 400
 
 SEM_CAMPO = "escolha o campo do indicador"
@@ -52,9 +53,12 @@ def _conta(indicador) -> str:
 
 
 def _filtro(coluna: str | None, inicio: str, fim: str = "") -> str:
-    if not coluna or not inicio:
+    if not coluna:
         return ""
-    return f"{citar(coluna)} >= {inicio}{fim}"
+    limite = f"{citar(coluna)} < {ATE_HOJE}"
+    if not inicio:
+        return limite
+    return f"{citar(coluna)} >= {inicio}{fim} and {limite}"
 
 
 def _onde(coluna: str | None, inicio: str, fim: str = "") -> str:
@@ -172,7 +176,7 @@ async def _serie_com_anterior(
         f"select date_trunc('{balde}', {alinhado})::date::text as rotulo,"
         f" {conta} filter (where {tempo} >= {inicio}) as valor,"
         f" {conta} filter (where {tempo} < {inicio}) as anterior"
-        f" from {de} where {tempo} >= {inicio_anterior}"
+        f" from {de} where {tempo} >= {inicio_anterior} and {tempo} < {ATE_HOJE}"
         f" group by 1 order by 1 limit {LIMITE_SERIE}"
     )
     return [
@@ -291,7 +295,7 @@ async def compor(
         tempo = citar(indicador.tempo)
         valor = f"{conta} filter (where {tempo} >= {inicio})"
         anterior = f", {conta} filter (where {tempo} < {inicio}) as anterior"
-        onde = f" where {tempo} >= {inicio_anterior}"
+        onde = f" where {tempo} >= {inicio_anterior} and {tempo} < {ATE_HOJE}"
     else:
         valor, anterior, onde = conta, "", _onde(indicador.tempo, inicio)
     total = f", sum({valor}) over () as total" if aditivo else ""
@@ -341,7 +345,8 @@ async def mudancas(
                 f"select {citar(dimensao)}::text as grupo,"
                 f" {conta} filter (where {tempo} >= {inicio}) as valor,"
                 f" {conta} filter (where {tempo} < {inicio}) as anterior"
-                f" from {de} where {tempo} >= {inicio_anterior} group by 1"
+                f" from {de} where {tempo} >= {inicio_anterior}"
+                f" and {tempo} < {ATE_HOJE} group by 1"
             )
         except asyncpg.QueryCanceledError:
             raise Impossivel(SEM_TEMPO) from None
