@@ -238,6 +238,7 @@ class Indicador(BaseModel):
     origem: Literal["regra", "segmento", "manual"]
     confirmado: bool
     ordem: int
+    meta: float | None = None
 
 
 class IndicadorIn(BaseModel):
@@ -259,6 +260,7 @@ class IndicadorEdicao(BaseModel):
     periodo: PERIODO | None = None
     grafico: GRAFICO | None = None
     confirmado: bool | None = None
+    meta: float | None = Field(default=None, ge=0, allow_inf_nan=False)
 
 
 class Descartado(BaseModel):

@@ -22,6 +22,8 @@ import {
 import { humano } from "@/lib/rotulo";
 import CamposCalculados from "@/components/painel/campos";
 import Destaque, { APARAR } from "@/components/painel/destaque";
+import DefinirMeta from "@/components/painel/meta";
+import { metaDaJanela } from "@/lib/meta";
 import ControleJanela from "@/components/painel/janela";
 import Tile, { colunas } from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
@@ -354,6 +356,7 @@ export default function PainelDaConexao() {
                 janela={rotuloJanela}
                 selecionado={destaque?.id === i.id}
                 aparar={APARAR.has(janela)}
+                alvo={metaDaJanela(i.meta, i.agregacao, janela)}
                 onSelecionar={() => setSelecionado(i.id)}
               />
             ))}
@@ -367,6 +370,26 @@ export default function PainelDaConexao() {
               janela={janela}
               rotuloDe={rotulo}
               carregandoSerie={carregandoSerie}
+              acao={
+                aberta?.papel === "dono" ? (
+                  <DefinirMeta
+                    base={`${base}/${id}`}
+                    indicador={destaque}
+                    onSalvo={(meta) => {
+                      paineis.clear();
+                      setPainel(
+                        (p) =>
+                          p && {
+                            ...p,
+                            indicadores: p.indicadores.map((i) =>
+                              i.id === destaque.id ? { ...i, meta } : i,
+                            ),
+                          },
+                      );
+                    }}
+                  />
+                ) : undefined
+              }
             />
           )}
         </>

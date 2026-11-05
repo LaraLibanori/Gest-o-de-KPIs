@@ -238,6 +238,7 @@ class Indicador(Base):
             " ('sempre', 'ultimos_7_dias', 'ultimos_30_dias', 'ultimos_90_dias', 'ano_atual')",
             name="indicadores_periodo_check",
         ),
+        sa.CheckConstraint("meta >= 0", name="indicadores_meta_check"),
         sa.Index("indicadores_nome_unico", "conexao_id", "nome", unique=True),
     )
 
@@ -257,6 +258,9 @@ class Indicador(Base):
     origem: Mapped[str] = mapped_column(Text)
     confirmado: Mapped[bool] = mapped_column(Boolean, server_default=sa.false())
     ordem: Mapped[int] = mapped_column(Integer)
+    meta: Mapped[float | None] = mapped_column(
+        sa.Numeric(asdecimal=False), nullable=True
+    )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

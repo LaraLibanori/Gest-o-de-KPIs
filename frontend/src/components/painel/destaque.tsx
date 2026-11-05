@@ -1,12 +1,14 @@
 "use client";
 
 import type { Dimensao, IndicadorCalculado, Janela } from "@/lib/api";
+import { metaPorPonto } from "@/lib/meta";
 import { ehDinheiro } from "@/lib/numero";
 import Composicao from "@/components/painel/composicao";
 import Evolucao from "@/components/painel/evolucao";
 import Mudancas from "@/components/painel/mudancas";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -32,6 +34,7 @@ export default function Destaque({
   rotuloDe,
   carregandoSerie = false,
   origem,
+  acao,
 }: {
   indicador: IndicadorCalculado;
   base: string;
@@ -40,9 +43,11 @@ export default function Destaque({
   rotuloDe: (coluna: string | null) => string;
   carregandoSerie?: boolean;
   origem?: string;
+  acao?: React.ReactNode;
 }) {
   const forma = indicador.grafico;
   const moeda = ehDinheiro(indicador);
+  const comGrafico = forma === "linha" || forma === "numero";
 
   const evolucao = (
     <Card>
@@ -57,6 +62,7 @@ export default function Destaque({
           )}
         </CardTitle>
         <CardDescription>{BALDES[janela] ?? ""}</CardDescription>
+        {acao && comGrafico && <CardAction>{acao}</CardAction>}
       </CardHeader>
       <CardContent>
         <Evolucao
@@ -67,6 +73,11 @@ export default function Destaque({
           carregando={carregandoSerie}
           moeda={moeda}
           aparar={APARAR.has(janela)}
+          meta={metaPorPonto(
+            indicador.meta,
+            indicador.agregacao,
+            janela as Janela,
+          )}
         />
       </CardContent>
     </Card>
@@ -77,6 +88,7 @@ export default function Destaque({
       <CardHeader>
         <CardTitle className="text-sm">Divisão de {indicador.nome}</CardTitle>
         <CardDescription>Clique numa linha para ver o detalhe.</CardDescription>
+        {acao && !comGrafico && <CardAction>{acao}</CardAction>}
       </CardHeader>
       <CardContent>
         <Composicao

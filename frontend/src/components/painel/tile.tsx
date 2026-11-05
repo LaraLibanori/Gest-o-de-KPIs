@@ -7,7 +7,8 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { FRASES, type IndicadorCalculado } from "@/lib/api";
-import { cheio, curto, ehDinheiro, subirEBom } from "@/lib/numero";
+import { cheio, curto, ehDinheiro, eixo, subirEBom } from "@/lib/numero";
+import { situacao } from "@/lib/meta";
 import { humano, variacao } from "@/lib/rotulo";
 import Sparkline from "@/components/painel/sparkline";
 import { cn } from "@/lib/utils";
@@ -47,6 +48,45 @@ function Delta({ valor, bom = true }: { valor: number | null; bom?: boolean }) {
   );
 }
 
+const SITUACOES = {
+  atingiu: { cor: "bg-emerald-500", texto: "atingida" },
+  perto: { cor: "bg-amber-500", texto: "quase lá" },
+  longe: { cor: "bg-rose-500", texto: "" },
+};
+
+function Meta({
+  valor,
+  alvo,
+  bom,
+  moeda,
+}: {
+  valor: number;
+  alvo: number;
+  bom: boolean;
+  moeda: boolean;
+}) {
+  const estado = situacao(valor, alvo, bom);
+  const { cor, texto } = SITUACOES[estado];
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs">
+      <span className={cn("size-2 shrink-0 rounded-full", cor)} />
+      <span className="text-muted-foreground whitespace-nowrap">
+        Meta {eixo(alvo, moeda)}
+      </span>
+      <span className="whitespace-nowrap">
+        {alvo > 0 && (
+          <span className="font-medium tabular-nums">
+            {Math.floor((valor / alvo) * 100 + 1e-9)}%{" "}
+          </span>
+        )}
+        <span className="text-muted-foreground">
+          {texto || (bom ? "abaixo" : "acima")}
+        </span>
+      </span>
+    </p>
+  );
+}
+
 export function colunas(quantos: number): string {
   if (quantos === 5) return "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
   if (quantos % 3 === 0) return "sm:grid-cols-2 lg:grid-cols-3";
@@ -59,6 +99,7 @@ export default function Tile({
   selecionado,
   origem,
   aparar = false,
+  alvo,
   onSelecionar,
 }: {
   indicador: IndicadorCalculado;
@@ -66,6 +107,7 @@ export default function Tile({
   selecionado: boolean;
   origem?: string;
   aparar?: boolean;
+  alvo?: number | null;
   onSelecionar: () => void;
 }) {
   const rotulo = humano(indicador.coluna ?? "");
@@ -116,6 +158,14 @@ export default function Tile({
               </span>
             )}
           </div>
+          {alvo != null && indicador.valor !== null && (
+            <Meta
+              valor={indicador.valor}
+              alvo={alvo}
+              bom={subirEBom(indicador)}
+              moeda={moeda}
+            />
+          )}
         </div>
       )}
 

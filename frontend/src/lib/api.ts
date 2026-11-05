@@ -173,6 +173,7 @@ export type Indicador = {
   origem: "regra" | "segmento" | "manual";
   confirmado: boolean;
   ordem: number;
+  meta: number | null;
 };
 
 export type Proposta = {

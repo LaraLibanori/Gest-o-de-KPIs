@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
@@ -25,6 +26,7 @@ export default function Evolucao({
   carregando = false,
   moeda = false,
   aparar = false,
+  meta = null,
 }: {
   pontos: Quebra[];
   rotulo: string;
@@ -33,6 +35,7 @@ export default function Evolucao({
   carregando?: boolean;
   moeda?: boolean;
   aparar?: boolean;
+  meta?: number | null;
 }) {
   const todos = pontos.filter((p) => p.valor !== null);
   const cortar = aparar && todos.length > 4;
@@ -126,6 +129,21 @@ export default function Evolucao({
             strokeWidth={2}
             isAnimationActive={false}
           />
+          {meta !== null && (
+            <ReferenceLine
+              y={meta}
+              stroke="var(--color-amber-500)"
+              strokeDasharray="6 4"
+              strokeWidth={1.5}
+              ifOverflow="extendDomain"
+              label={{
+                value: `meta ${eixo(meta, moeda)}`,
+                position: "insideTopRight",
+                fill: "var(--color-amber-500)",
+                fontSize: 11,
+              }}
+            />
+          )}
           {comAnterior && (
             <Line
               dataKey="anterior"

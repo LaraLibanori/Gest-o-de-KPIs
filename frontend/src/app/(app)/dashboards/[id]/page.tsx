@@ -17,6 +17,7 @@ import {
 import { falhar } from "@/lib/erros";
 import { humano } from "@/lib/rotulo";
 import Destaque, { APARAR } from "@/components/painel/destaque";
+import { metaDaJanela } from "@/lib/meta";
 import ControleJanela from "@/components/painel/janela";
 import Tile, { colunas } from "@/components/painel/tile";
 import { Cabecalho, Pagina } from "@/components/pagina";
@@ -277,6 +278,7 @@ export default function DetalheDoDashboard() {
                     janela={rotuloJanela}
                     selecionado={destaque?.id === i.id}
                     aparar={APARAR.has(janela)}
+                    alvo={metaDaJanela(i.meta, i.agregacao, janela)}
                     onSelecionar={() => setSelecionado(i.id)}
                   />
                 ))}
