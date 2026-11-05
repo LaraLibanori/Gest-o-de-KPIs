@@ -1,3 +1,4 @@
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 
@@ -22,3 +23,12 @@ async def test_com_o_segredo_certo_a_chamada_chega_na_autenticacao(banco, monkey
     monkeypatch.setattr("app.main.SEGREDO_SERVIDOR", "abc")
     resposta = await _chamar("/perfil", {"x-segredo-servidor": "abc"})
     assert resposta.status_code in (401, 403)
+
+
+def test_producao_sem_segredo_nao_sobe(monkeypatch):
+    from app.config import conferir_ambiente
+
+    monkeypatch.setenv("VERCEL_ENV", "production")
+    monkeypatch.delenv("SEGREDO_SERVIDOR", raising=False)
+    with pytest.raises(RuntimeError, match="SEGREDO_SERVIDOR"):
+        conferir_ambiente()

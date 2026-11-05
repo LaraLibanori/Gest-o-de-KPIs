@@ -17,9 +17,6 @@ senha    admin123
 Também dá para criar a sua na própria tela de login: a conta já entra ativa,
 sem confirmar e-mail.
 
-Por enquanto estão prontos o login, as organizações, o cadastro das conexões,
-a definição dos indicadores e o painel que calcula cada um deles.
-
 ## Como funciona
 
 O login passa pelo servidor do Next, que fala com o Supabase Auth e guarda a
@@ -37,7 +34,7 @@ Os dois sobem juntos na Vercel, no mesmo domínio: `/api/*` vai para o backend
 e o resto para o front, conforme o `vercel.json`.
 
 ```
-frontend/   Next.js 15 (App Router) + React 19 + TypeScript + shadcn/ui
+frontend/   Next.js 16 (App Router) + React 19 + TypeScript + shadcn/ui
 backend/    FastAPI + SQLAlchemy + Alembic
 supabase/   seed.sql, para rodar no SQL Editor
 ```
@@ -130,7 +127,7 @@ Os dois últimos terminam conferindo as rotas principais.
 | backend  | `NVIDIA_API_KEY`                | sugestão de rótulo, pela NVIDIA (gratuita) |
 | backend  | `OPENROUTER_API_KEY`            | sugestão de rótulo no catálogo |
 | backend  | `GROQ_API_KEY`                  | o mesmo, como segunda opção |
-| ambos    | `SEGREDO_SERVIDOR`              | em produção, o mesmo valor no front e no back |
+| ambos    | `SEGREDO_SERVIDOR`              | obrigatório em produção, o mesmo valor no front e no back |
 | backend  | `LLM_LIMITE_USUARIO`            | sugestões por pessoa por dia (padrão 20) |
 | backend  | `LLM_LIMITE_TOTAL`              | sugestões do sistema por dia (padrão 200) |
 
@@ -176,6 +173,8 @@ distintos das colunas. Nenhuma linha da tabela do cliente sai do banco dele.
 | PATCH  | `/api/.../indicadores/{iid}`                      |
 | POST   | `/api/.../indicadores/graficos`                   |
 | GET    | `/api/organizacoes/{id}/conexoes/{cid}/painel`    |
+| GET    | `/api/organizacoes/{id}/conexoes/{cid}/mudancas`  |
+| POST   | `/api/.../conexoes/{cid}/mudancas/resumo`         |
 | DELETE | `/api/.../indicadores/{iid}`                      |
 | GET    | `/api/organizacoes/{id}/dashboards`               |
 | POST   | `/api/organizacoes/{id}/dashboards`               |
@@ -195,13 +194,15 @@ Menos `/health` e `/ready`, todas pedem `Authorization: Bearer <token>`.
 Dá para convidar quem ainda não tem conta: o convite fica guardado e a pessoa
 entra na organização quando se cadastrar.
 
-## O que falta
+## O que a plataforma faz
 
-- [x] Ler os metadados da tabela fato e sugerir métricas e dimensões
-- [x] Assistente em etapas para cadastrar a conexão
-- [x] Sugestão de rótulo e papel por LLM
-- [x] Indicadores por ramo de negócio, com confirmação dos campos
-- [x] Campos calculados
-- [x] Painel com os indicadores calculados no banco do cliente
-- [x] Tipo de gráfico sugerido e trocável, com número, barra, linha, pizza e tabela
-- [x] Dashboards com os indicadores da organização
+- Lê os metadados da tabela fato e sugere métricas e dimensões
+- Assistente em etapas para cadastrar a conexão
+- Sugestão de rótulo e papel por LLM
+- Indicadores por ramo de negócio, com confirmação dos campos
+- Campos calculados
+- Painel com os indicadores calculados no banco do cliente, comparando com o
+  período anterior
+- Tipo de gráfico sugerido e trocável: número, barra, linha, pizza e tabela
+- O que mudou em cada indicador, com explicação por LLM quando pedida
+- Meta mensal por indicador, com sinal de atingida, perto ou abaixo

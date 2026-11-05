@@ -27,8 +27,8 @@ ESCOPO := ivanabreuelementardis-projects
 VERCEL := vercel --scope $(ESCOPO)
 
 # O que precisa estar cadastrado na Vercel para o deploy funcionar.
-VARS_FRONT := SUPABASE_URL SUPABASE_ANON_KEY
-VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY NVIDIA_API_KEY OPENROUTER_API_KEY GROQ_API_KEY
+VARS_FRONT := SUPABASE_URL SUPABASE_ANON_KEY SEGREDO_SERVIDOR
+VARS_BACK := SUPABASE_URL DATABASE_URL APP_SECRET_KEY SEGREDO_SERVIDOR NVIDIA_API_KEY OPENROUTER_API_KEY GROQ_API_KEY
 
 # Le o arquivo de ambiente ignorando o \r que o Windows deixa no fim da linha.
 CARREGAR = set -a; . <(tr -d '\r' < $(1)); set +a
@@ -78,7 +78,7 @@ dev: portas
 	$(MAKE) --no-print-directory dev-front & \
 	wait
 
-# Sem o --port o Next pula de porta e o CORS do backend erra o alvo.
+# Sem o --port o Next pula para outra porta quando a 3000 está ocupada.
 dev-front:
 	cd frontend && BACKEND_URL=$(URL_BACK) npm run dev -- --port $(PORTA_FRONT)
 
@@ -162,7 +162,7 @@ env-front:
 	  [ -n "$$valor" ] || { echo "falta $$nome em $(ENV_FRONT)"; exit 1; }; \
 	  case "$$valor" in *xxxxxxxx*|*SENHA*|"eyJ...") echo "$$nome ainda esta com o valor de exemplo em $(ENV_FRONT)"; exit 1;; esac; \
 	  for alvo in production preview; do \
-	  printf '%s' "$valor" | $(VERCEL) env add "$nome" "$alvo" --force --yes --non-interactive >/dev/null; \
+	  printf '%s' "$$valor" | $(VERCEL) env add "$$nome" "$$alvo" --force --yes --non-interactive >/dev/null; \
 	  done; \
 	  echo "ok  $$nome"; \
 	done
@@ -174,7 +174,7 @@ env-back:
 	  [ -n "$$valor" ] || { echo "falta $$nome em $(ENV_BACK)"; exit 1; }; \
 	  case "$$valor" in *xxxxxxxx*|*SENHA*|"eyJ...") echo "$$nome ainda esta com o valor de exemplo em $(ENV_BACK)"; exit 1;; esac; \
 	  for alvo in production preview; do \
-	  printf '%s' "$valor" | $(VERCEL) env add "$nome" "$alvo" --force --yes --non-interactive >/dev/null; \
+	  printf '%s' "$$valor" | $(VERCEL) env add "$$nome" "$$alvo" --force --yes --non-interactive >/dev/null; \
 	  done; \
 	  echo "ok  $$nome"; \
 	done

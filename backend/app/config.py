@@ -26,8 +26,11 @@ def conferir_ambiente() -> None:
     faltando = [nome for nome in OBRIGATORIAS if not os.environ.get(nome)]
     if faltando:
         raise RuntimeError(f"faltam variáveis de ambiente: {', '.join(faltando)}")
-    if PERMITIR_REDE_INTERNA and os.environ.get("VERCEL_ENV") == "production":
+    producao = os.environ.get("VERCEL_ENV") == "production"
+    if PERMITIR_REDE_INTERNA and producao:
         raise RuntimeError("PERMITIR_REDE_INTERNA não pode ficar ligado em produção")
+    if producao and not os.environ.get("SEGREDO_SERVIDOR"):
+        raise RuntimeError("SEGREDO_SERVIDOR é obrigatório em produção")
 
 
 def url_asyncpg(url: str) -> str:
