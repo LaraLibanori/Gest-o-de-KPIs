@@ -11,3 +11,9 @@ nvidia_api_key
 .vercel
 *.pem
 *.tsbuildinfo
+
+# Playwright (frontend/e2e)
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/playwright/.cache/

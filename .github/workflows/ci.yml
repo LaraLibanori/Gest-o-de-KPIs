@@ -25,6 +25,23 @@ jobs:
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=critical
 
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+
   backend:
     runs-on: ubuntu-latest
     defaults:
@@ -52,7 +69,9 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: ruff check app alembic tests
-      - run: ruff format --check app alembic tests
+      - run: ruff check app alembic tests scripts
+      - run: ruff format --check app alembic tests scripts
       - run: bandit -r app -ll -q -s B608
       - run: python -m pytest -q
+      - name: E2E (API real por HTTP, sem depender do Supabase)
+        run: python scripts/smoke_test.py

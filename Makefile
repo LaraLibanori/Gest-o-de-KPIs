@@ -43,6 +43,7 @@ ajuda:
 	@echo "make checar     lint, typecheck, build e bandit, igual ao CI"
 	@echo "make auditar    npm audit nas dependencias de producao"
 	@echo "make testes     roda os testes do backend (precisa de um Postgres vazio)"
+	@echo "make e2e        sobe a API de verdade e roda o caminho feliz por HTTP (mesmo Postgres)"
 	@echo "make migrar     aplica as migrations pendentes no banco"
 	@echo "make migracao m=\"texto\"   cria uma migration a partir do models.py"
 	@echo "make migracoes  mostra a migration atual e o historico"
@@ -131,11 +132,17 @@ taxas:
 testes:
 	cd backend && "$(PY)" -m pytest -q
 
+# Sobe a API de verdade e confere o caminho feliz completo por HTTP real
+# (ver backend/scripts/smoke_test.py). Precisa do mesmo Postgres vazio que
+# `make testes` usa.
+e2e:
+	cd backend && "$(PY)" scripts/smoke_test.py
+
 checar: lint checar-front checar-back
 
 lint:
-	cd backend && "$(PY)" -m ruff check app alembic tests
-	cd backend && "$(PY)" -m ruff format --check app alembic tests
+	cd backend && "$(PY)" -m ruff check app alembic tests scripts
+	cd backend && "$(PY)" -m ruff format --check app alembic tests scripts
 
 # Build antes do tsc: e ele que regenera o .next/types.
 checar-front:
