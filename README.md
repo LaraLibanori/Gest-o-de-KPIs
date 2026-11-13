@@ -7,15 +7,23 @@ Projeto de TCC — Parte 5 (Desenvolvimento da aplicação).
 
 No ar: <https://kpi-builder-ivanabreuelementardis-projects.vercel.app>
 
-Conta para testar:
+### Conta de demonstração
 
-```
-e-mail   admin@kpibuilder.app
-senha    admin123
-```
+Para a banca não precisar cadastrar nada, existe uma conta de demonstração.
+A credencial não fica neste README público — peça-a à Lara ou ao Ivan por
+fora do repositório (e-mail, mensagem). Dois cuidados a mais, pensados para
+uma conta que qualquer pessoa com o link pode acessar:
 
-Também dá para criar a sua na própria tela de login: a conta já entra ativa,
-sem confirmar e-mail.
+- Ela entra como **membro** (não dona) da organização de exemplo: pode ver
+  conexões, indicadores e dashboards, mas não cria, edita nem apaga nada.
+  Quem precisar demonstrar o assistente de cadastro (etapas de conexão) deve
+  usar a própria conta, criada na tela de login — isso não exige confirmar
+  e-mail.
+- `supabase/demo_somente_leitura.sql` rebaixa a conta para membro e pode ser
+  rodado de novo sempre que quiser conferir ou reaplicar essa proteção.
+
+Também dá para criar a sua própria conta na tela de login: ela já entra
+ativa, sem confirmar e-mail.
 
 ## Como funciona
 
@@ -206,3 +214,34 @@ entra na organização quando se cadastrar.
 - Tipo de gráfico sugerido e trocável: número, barra, linha, pizza e tabela
 - O que mudou em cada indicador, com explicação por LLM quando pedida
 - Meta mensal por indicador, com sinal de atingida, perto ou abaixo
+
+## Limitações e trabalhos futuros
+
+O que existe hoje cobre o fluxo completo de um MVP (conectar banco → entender
+a tabela → sugerir indicadores → calcular → montar dashboard), mas assume
+decisões de escopo que vale deixar explícitas:
+
+- **Só PostgreSQL.** A conexão fala asyncpg direto com o banco do cliente;
+  MySQL, SQL Server e upload de CSV ficam de fora.
+- **Uma tabela fato por conexão, sem junção com dimensões.** O modelo
+  estrela de Kimball é coberto só parcialmente — não há como combinar duas
+  tabelas relacionadas numa mesma conexão.
+- **Cálculo sempre ao vivo no banco do cliente, sem cache.** Em dashboards
+  com muitos indicadores e bancos lentos, o orçamento de 4s por consulta pode
+  não bastar.
+- **Sem exportação.** Não há PDF, CSV, imagem ou link público de dashboard.
+- **Sem filtro por dimensão no dashboard consolidado** (ex.: só a região
+  Sul) — o painel de uma conexão isolada já corta por período, mas o
+  dashboard que junta indicadores de várias conexões não tem esse filtro.
+- **Só dois papéis.** `dono` e `membro`; não existe um papel "somente
+  leitura" dedicado (a conta de demonstração usa `membro` como aproximação).
+- **Cadastro aberto sem confirmação de e-mail.** Simplifica testar a
+  plataforma, mas também permite contas descartáveis consumindo a cota
+  diária de chamadas à LLM.
+- **Infraestrutura em conta pessoal.** Vercel e Supabase estão hoje na conta
+  do Ivan; não há ainda um procedimento documentado de reconstrução caso ela
+  fique indisponível.
+
+Nenhum desses pontos é um defeito do que foi entregue — são extensões
+naturais para uma versão além do TCC, e ficam registrados aqui para não
+serem confundidos com lacunas não percebidas.
