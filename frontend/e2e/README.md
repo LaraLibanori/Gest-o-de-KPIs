@@ -22,7 +22,7 @@ O login deste projeto passa inteiro pelo servidor do Next
 lado do servidor, nunca do navegador) e guarda a sessão num cookie
 `httpOnly` — desenho pensado para o token nunca aparecer no navegador. Isso
 é ótimo para segurança e péssimo para testar sem depender de um Supabase
-real: não existe chamada de rede do *browser* para interceptar com
+real: não existe chamada de rede do _browser_ para interceptar com
 `page.route()`, porque a chamada é feita pelo processo do Next, não pelo
 Chromium.
 
@@ -34,10 +34,10 @@ Postgres — de verdade. Concretamente, faltam:
 
 1. Um servidor HTTP mínimo que imite o Supabase Auth (GoTrue) nos quatro
    endpoints que o `@supabase/auth-js` usado aqui chama: `POST
-   /auth/v1/token?grant_type=password` (login), `POST /auth/v1/signup`,
+/auth/v1/token?grant_type=password` (login), `POST /auth/v1/signup`,
    `GET /auth/v1/user` e `GET /auth/v1/.well-known/jwks.json`. As duas
    primeiras precisam devolver `{access_token, refresh_token, expires_in,
-   token_type, user}` no formato que o `@supabase/auth-js` espera (função
+token_type, user}` no formato que o `@supabase/auth-js` espera (função
    `hasSession` em `node_modules/@supabase/auth-js/dist/main/lib/fetch.js`
    — vale ler antes de implementar, para não montar algo incompatível).
 2. O `access_token` emitido precisa ser um JWT ES256 de verdade, verificável

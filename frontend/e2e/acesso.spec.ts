@@ -28,7 +28,7 @@ test("tela de login mostra os dois modos e os campos esperados", async ({
 test("visitar uma rota protegida sem sessão redireciona para o login", async ({
   page,
 }) => {
-  await page.goto("/conexoes");
+  await page.goto("/configuracoes");
   await expect(page).toHaveURL(/\/login/);
 });
 
